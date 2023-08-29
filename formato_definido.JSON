@@ -1,0 +1,9 @@
+{
+    "type": "message|echo|info",
+    "headers": {
+        "from": "foo",
+        "to": "bar",
+        "hop_count": 3
+    },
+    "payload": "loremipsum{lo que sea aca}"
+}
