@@ -13,6 +13,7 @@
 */
 
 const { client, xml, jid } = require("@xmpp/client");
+const { Node } = require("./node");
 const fs = require("fs");
 
 class xmClient {
@@ -48,14 +49,14 @@ class xmClient {
                 rejectUnauthorized: true,
             }
         });
-        
+
         /* Connection on
         */
         this.conn.on("online", async (jid) => {
             console.log("\n >> Login successful! JID:\n", jid.toString());
             this.userJID = jid.toString().split("/")[0];
             this.JIDdevice = jid.toString();
-            
+
             // Cambiar el estado de presencia a "activo"
             const presenceStanza = xml(
                 "presence",
@@ -65,7 +66,7 @@ class xmClient {
             );
             this.conn.send(presenceStanza);
         });
-        
+
         /* Listen for connection errors on login
         */
         this.conn.on("error", (err) => {
@@ -73,29 +74,29 @@ class xmClient {
             this.logError(identifier, err);
             console.error(" >> ERROR: error happened login (check error-log-xmpp.txt for info).");
         });
-        
+
         /* Read incoming stanzas
         */
         try {
             this.conn.start().then(() => {
                 // Read Stanzas
             });
-                
+
         } catch (error) {
             const identifier = "connStart";
             this.logError(identifier, error);
             console.error(" >> ERROR: error happened during connStart (check error-log-xmpp.txt for info).");
-            
+
         }
     }
 
-    async addNeighbor() {}
-    
-    async sendLinkState() {}
-    
-    async sendDistanceVector() {}
+    async addNeighbor() { }
 
-    async sendFlooding() {}
+    async sendLinkState() { }
+
+    async sendDistanceVector() { }
+
+    async sendFlooding() { }
 }
 
 module.exports = {
