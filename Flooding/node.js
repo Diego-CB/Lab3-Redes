@@ -72,28 +72,55 @@ class Node {
     es aqui donde para ejecutar la lógica de flooding se llama a la función de la clase
     Node floodMessage.
     */
-    receiveMessage(message) {
-        console.log(` >> Node ${this.name} recieving message: ${message}`);
-        
+    receiveMessage(message) {        
         try {
             const jsonObject = JSON.parse(message);
         
-            const messageType = jsonObject.type;
-            const from = jsonObject.headers.from;
-            const to = jsonObject.headers.to;
-            const hopCount = jsonObject.headers.hop_count;
-            const receivers = jsonObject.headers.recievers;
-            const payload = jsonObject.payload;
+            let messageType = jsonObject.type;
+            let from = jsonObject.headers.from;
+            let to = jsonObject.headers.to;
+            let hopCount = jsonObject.headers.hop_count;
+            let receivers = jsonObject.headers.recievers;
+            let payload = jsonObject.payload;
 
             if (from == this.name){
                 console.log(` >> Message was sent by this user. No action needed.`);
                 return 0
             }
-            // revisar si soy el to
-
             // si estoy en la lista no hago nada
+            if (receivers.find(elemento => elemento === this.name)) {
+                console.log("El elemento está en el array.");
+                return 0
+            } else {
+                // revisar si soy el to
+                if (to == this.name){
+                    console.log(` >> Message recieved. The message is: ${payload}`)
+                    hopCount == 0
+                    receivers.push(this.name)
+                    return 2
+                } else {
+                    // si no estoy en la lista y no soy en destinatario me agrego y envio el mensaje por flood a mis neighbors y reduzco el hopCount.
+                    hopCount = hopCount - 1
+                    receivers.push(this.name)
+                    from = this.name
 
-            // si no estoy en la lista me agrego y envio el mensaje por flood a mis neighbors y reduzco el hopCount.
+                    const paquete = {
+                        type: messageType,
+                        headers: {
+                            from: from,
+                            to: to,
+                            hop_count: hopCount,
+                            recievers: receivers
+                        },
+                        payload: payload
+                    }
+
+                    this.floodMessage(paquete)
+
+                }
+            }
+            
+            
             
         } catch (error) {
             console.error("Error al analizar el JSON:", error.message);
