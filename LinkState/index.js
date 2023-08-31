@@ -1,17 +1,29 @@
-const { input, print, intInput } = require('./util')
 const { dijkstra } = require('./Dijkstra')
+
+const {
+    input,
+    print,
+    intInput,
+    show_discover,
+} = require('./util')
+
+const {
+    makeJson,
+    make_disc_msg,
+    build_graph
+} = require('./LS')
 
 const menu_discover = '\n' + 
     '---------------------------- \n' +
     '1) Ingresar mensaje de descubrimiento \n' +
-    '2) Ya no hay mensajes\n' +
+    '2) Mostrar mensajes de descubrimiento\n' +
+    '3) Ya no hay mensajes\n' +
     '>  '
 
 const menu_msg = '\n' + 
     '---------------------------- \n' +
     '1) Enviar mensaje \n' +
     '2) Recibir mensaje\n' +
-    '3) Mostrar mensajes de descubrimiento\n' +
     's) Salir\n' +
     '>  '
 
@@ -22,7 +34,7 @@ const main = async () => {
 
     print('---- Link State Routing ----')
     const node_name = await input('Ingrese nombre del nodo: ')
-    const neighbors = []
+    const topology = []
 
     print('\n---- Ingreso de nodos vecinos ----')
     let finish_neighbors
@@ -31,8 +43,9 @@ const main = async () => {
         let neighbor_name = await input('Ingrese el nombre del nodo vecino: ')
         let cost = await intInput(`Ingrese el costo de ${neighbor_name}: `)
 
-        neighbors.push({
-            name: neighbor_name,
+        topology.push({
+            from: node_name,
+            to: neighbor_name,
             cost: cost,
         })
 
@@ -42,36 +55,37 @@ const main = async () => {
     print('\n---- Fase de descrubrimiento ----')
     print('\n-> Mensjaes de descubrimiento salientes:')
     
-    //TODO fix discovery msg
-    const desc_msg = []
-    neighbors.map(node => {
-        const name = node.name
-        const cost = node.cost
-
-        const new_msg = neighbors.map(next_node => {
-            if (next_node.name !== name) {
-                desc_msg.push(`To ${next_node.name} from ${node_name}: Puedor ir a ${name} con costo ${cost}`)
-            }
-        })
-    })
-
-    desc_msg.map(msg => print(msg))
-    await input('\nPresione ENTER para continuar')
-    return
-
+    const desc_msg = make_disc_msg(topology)
+    await show_discover(desc_msg)
+    
     let finish_discover
 
-    while (finish_discover != '2') {
+    while (finish_discover != '3') {
         finish_discover = await input(menu_discover)
 
         if (finish_discover === '1') {
-            //TODO HANDLE discover msg
+            let discover_msg = await input('Ingrese el mensaje: ')
+            discover_msg = JSON.parse(discover_msg)
+            const from = discover_msg.headers.from
+            const payload_info = discover_msg.payload.split('->')
+            const to = payload_info[0]
+            const cost = parseInt(payload_info[1])
+            topology.push({from, to, cost})
+
+        } else if (finish_discover === '2') {
+            await show_discover(desc_msg)
         }
     }
 
-    //TODO calcular dijstra
-    print('Se calculo la tabla de ruteo exitosamente')
+    print('\n---- Fase Calculo de tablas de enrutamiento ----')
+    print('Topologia completa ingresada:')
+    show_discover(topology)
 
+    const graph = build_graph(topology)
+
+    return
+    print('Se calculo la tabla de ruteo exitosamente')
+    dijkstra(graph, 0)
 
     print('---- Fase de envio de mensajes ----')
     let option_msg
@@ -83,8 +97,6 @@ const main = async () => {
             //TODO HANDLE enviar mensaje
         } else if (finish_discover === '2') {
             //TODO HANDLE Recibir mensaje
-        } else if (finish_discover === '3') {
-            desc_msg.map(msg => print(msg))
         }
     }
 

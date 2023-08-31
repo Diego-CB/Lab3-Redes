@@ -1,4 +1,8 @@
 
+/**
+ * Python "print" like function
+ * @param  {...any} o any objects to be printed
+ */
 const print = (...o) => {
     if (o.length === 0) return console.log()
 
@@ -26,6 +30,11 @@ const input = async (msg) => {
     });
 }
 
+/**
+ * This function ask for user inputs, converts it to int and handle casting errors
+ * @param {string} msg message to be shown in input
+ * @returns the user input as integer
+ */
 const intInput = async (msg) => {
     while (true) {
         let input_str = parseInt(await input(msg))
@@ -38,8 +47,18 @@ const intInput = async (msg) => {
     }
 }
 
+/**
+ * Prints every object in an array and keeps it on console for a while
+ * @param {Array[string]} desc_msg array to be printed
+ */
+const show_discover = async (desc_msg) => {
+    desc_msg.map(msg => console.log(msg))
+    await input('\nPresione ENTER para continuar')
+}
+
 module.exports = {
     input,
     print,
-    intInput
+    intInput,
+    show_discover
 }
