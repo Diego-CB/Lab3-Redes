@@ -46,6 +46,38 @@ function xmppConnection(username, password) {
   })
 }
 
+function inputVecino(json){
+  let nodos = json.nodos
+
+
+  rl.question('Quieres agregar un vecino? (Y/N)', option1 => {
+    if (option.toLowerCase() === 'y') {
+      rl.question('Como se llama el vecino', vecinoID => {
+        if (nodos.includes(vecinoID)) {
+          rl.close();
+          //El vecino si existe
+          neighborindex = nodos.indexOf(vecinoID)
+          rl.question('Cual es el costo de enlace con este vecino', cost => {
+            // Usando parseInt para convertir la cadena 'cost' en un número entero
+            const cost = parseInt(cost, 10);
+            // Asegurarte de que tienes un número
+            if (isNaN(cost)) {
+              console.log('Por favor, introduce un número válido.');
+              return null
+            } else {
+              //Se ingreso un costo valido 
+              return cost, neighborindex;
+            }
+          });
+        } else {
+          console.log('El vecino no existe en la topologia')
+          return null, null
+        }
+      });
+    } 
+  });
+}
+
 
 function promptMenu() {
   rl.question('Que nodo soy? ', nodeid => {
@@ -57,27 +89,11 @@ function promptMenu() {
         const json = JSON.parse(data);
         let nodos = json.nodos
         if (nodos.includes(nodeid)) {
-          console.log('El nodo existe')
-          console.log(nodos);
+          //'El nodo existe'
+          inputVecino(json)
           indexnode = nodos.indexOf(nodeid)
-          let table = []
-          let myTable = []
-          for (let i = 0; i < nodos.length; i++) {
-            if (i == indexnode) {
-              table.push(json.topologia[i])
-            } else {
-              table.push(new Array(nodos.length).fill('∞'))
-            }
-            myTable.push(json.topologia[i])
-          }
-          console.log('')
-          for (const elemento of table) {
-            console.log(`| ${elemento} |`);
-          }
-          console.log('')
-          for (const elemento of myTable) {
-            console.log(`| ${elemento} |`);
-          }
+          let myvector = new Array(nodos.length).fill(0);
+          let localTopology = []
         } else {
           console.log('El nodo no existe')
         }
