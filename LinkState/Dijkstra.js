@@ -56,6 +56,29 @@ const dijkstra = (graph, src) => {
 	return route_tree
 }
 
+/**
+ * Gets the steps and cost to certain node
+ * @param {number} target target node
+ * @param {Array[Array[number]]} route_tree
+ * @param {number} src source node
+ * @returns the steps and costs of the route
+ */
+const get_route = (target, route_tree, src) => {
+    if (target === src) return [[target], 0]
+
+    const cost = route_tree[target][0]
+    const steps = [route_tree[target][1]]    
+
+    while (true) {
+        if (steps[-1] == target) {
+            return [steps, cost]
+        }
+
+        steps.push(route_tree[steps[-1]][1])
+    }
+}
+
 module.exports = {
-    dijkstra
+    dijkstra,
+    get_route
 }

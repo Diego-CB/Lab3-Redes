@@ -1,17 +1,11 @@
-const { dijkstra } = require('./Dijkstra')
-
+const { dijkstra, get_route } = require('./Dijkstra')
+const { makeJson, make_disc_msg, build_graph } = require('./LS')
 const {
     input,
     print,
     intInput,
     show_discover,
 } = require('./util')
-
-const {
-    makeJson,
-    make_disc_msg,
-    build_graph
-} = require('./LS')
 
 const menu_discover = '\n' + 
     '---------------------------- \n' +
@@ -81,12 +75,10 @@ const main = async () => {
     print('Topologia completa ingresada:')
     show_discover(topology)
 
-    const graph = build_graph(topology)
+    const [graph, index_map] = build_graph(topology)
+    const routing_table = dijkstra(graph, 0)
 
     print('Se calculo la tabla de ruteo exitosamente')
-    const routing_table = dijkstra(graph, 0)
-    console.log(routing_table)
-    return
 
     print('---- Fase de envio de mensajes ----')
     let option_msg
@@ -94,10 +86,38 @@ const main = async () => {
     while (option_msg != 's') {
         option_msg = await input(menu_msg)
 
-        if (finish_discover === '1') {
-            //TODO HANDLE enviar mensaje
-        } else if (finish_discover === '2') {
-            //TODO HANDLE Recibir mensaje
+        if (option_msg === '1') {
+            const destin = await input('Ingrese destinatario: ')
+            const payload = await input('Ingrese Payload: ')
+            const [steps, cost] = get_route(
+                index_map[destin],
+                routing_table,
+                index_map[node_name]
+            )
+
+            const reverse_map = index_map.map(([key, value]) => [value, key])
+            const str_steps = steps.map(node => reverse_map[node])
+                .reduce((acc, value) => acc + ' -> ' + value, '')
+
+            print('Ruta a seguir' + str_steps)
+            print('Costo:', cost)
+
+            const to_send_msg = JSON.stringify(makeJson('message', node_name, destin, payload))
+            print('Mensaje a Enviar:')
+            print(to_send_msg)
+
+        } else if (option_msg === '2') {
+            const msg = await input('Ingrese el mensaje entrante: ')
+            const json_msg = JSON.parse(msg)
+
+            if (json_msg.to == node_name) {
+                print('mensaje recibido de', json_msg.from)
+                print('>', json_msg.payload)
+
+            } else {
+                print('Reenviar mensaje a', json_msg.to)
+                print(msg)
+            }
         }
     }
 
@@ -105,3 +125,4 @@ const main = async () => {
 }
 
 main()
+
