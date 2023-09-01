@@ -83,9 +83,10 @@ const main = async () => {
 
     const graph = build_graph(topology)
 
-    return
     print('Se calculo la tabla de ruteo exitosamente')
-    dijkstra(graph, 0)
+    const routing_table = dijkstra(graph, 0)
+    console.log(routing_table)
+    return
 
     print('---- Fase de envio de mensajes ----')
     let option_msg

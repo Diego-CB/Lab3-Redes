@@ -24,7 +24,6 @@ const makeJson = (type, from, to, payload, hop_count = 0) => {
 }
 
 /**
- * 
  * @param {Array[Object{to, from, cost}]} topology 
  * @returns The discovery message to be sent to the other nodes
  */
@@ -55,9 +54,46 @@ const make_disc_msg = (topology) => {
  * @returns the adyascence graph as a 2D array
  */
 const build_graph = (topology) => {
-    // TODO implementar build_graph
-    return []
+    const node_list = []
+
+    topology.map(info => {
+        const to = info.to
+        const from = info.from
+
+        !node_list.includes(to) && node_list.push(to)
+        !node_list.includes(from) && node_list.push(from)
+    })
+
+    const int_value = 0
+    // const int_value = 0
+
+    const graph = new Array(node_list.length)
+        .fill(int_value)
+        .map(() => new Array(node_list.length).fill(int_value))
+
+    const index_map = {}
+    node_list.map((node, index) => index_map[node] = index)
+
+    topology.map(info => {
+        graph[index_map[info.from]][index_map[info.to]] = info.cost
+        graph[index_map[info.to]][index_map[info.from]] = info.cost
+    })
+    return graph
 }
+
+const topology = [
+    { from: 'b', to: 'a', cost: 1 },
+    { from: 'b', to: 'c', cost: 2 },
+    { from: 'c', to: 'a', cost: 2 },
+    { from: 'c', to: 'd', cost: 3 },
+]
+
+const result_graph = build_graph(topology)
+console.log(result_graph)
+const { dijkstra } = require('./Dijkstra')
+
+const routing = dijkstra(result_graph, 1)
+console.log(routing)
 
 module.exports = {
     makeJson,
