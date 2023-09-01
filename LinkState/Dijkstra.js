@@ -72,6 +72,7 @@ const get_route = (target, route_tree, src) => {
     const [new_steps, _] = get_route(route_tree[target][1])
     return [steps, cost]
 
+    // TODO complite routing table
     while (true) {
         if (steps[steps.length-1] == target) {
             return [steps, cost]
