@@ -81,6 +81,9 @@ const main = async () => {
     print('Se calculo la tabla de ruteo exitosamente')
 
     print('---- Fase de envio de mensajes ----')
+    const reverse_map = Object.entries(index_map).map(([key, value]) => [value, key])
+    console.log('reverse_map')
+    console.log(reverse_map)
     let option_msg
 
     while (option_msg != 's') {
@@ -95,8 +98,7 @@ const main = async () => {
                 index_map[node_name]
             )
 
-            const reverse_map = index_map.map(([key, value]) => [value, key])
-            const str_steps = steps.map(node => reverse_map[node])
+            const str_steps = steps.map(node => reverse_map[node][1])
                 .reduce((acc, value) => acc + ' -> ' + value, '')
 
             print('Ruta a seguir' + str_steps)
@@ -105,7 +107,6 @@ const main = async () => {
             const to_send_msg = JSON.stringify(makeJson('message', node_name, destin, payload))
             print('Mensaje a Enviar:')
             print(to_send_msg)
-
         } else if (option_msg === '2') {
             const msg = await input('Ingrese el mensaje entrante: ')
             const json_msg = JSON.parse(msg)

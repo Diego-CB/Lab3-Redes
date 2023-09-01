@@ -82,19 +82,19 @@ const build_graph = (topology) => {
     return [graph, index_map]
 }
 
-const topology = [
-    { from: 'b', to: 'a', cost: 1 },
-    { from: 'b', to: 'c', cost: 2 },
-    { from: 'c', to: 'a', cost: 2 },
-    { from: 'c', to: 'd', cost: 3 },
-]
+// const topology = [
+//     { from: 'b', to: 'a', cost: 1 },
+//     { from: 'b', to: 'c', cost: 2 },
+//     { from: 'c', to: 'a', cost: 2 },
+//     { from: 'c', to: 'd', cost: 3 },
+// ]
 
-const [result_graph, index_map] = build_graph(topology)
-console.log(result_graph)
-const { dijkstra } = require('./Dijkstra')
+// const [result_graph, index_map] = build_graph(topology)
+// console.log(result_graph)
+// const { dijkstra } = require('./Dijkstra')
 
-const routing = dijkstra(result_graph, 1)
-console.log(routing)
+// const routing = dijkstra(result_graph, 1)
+// console.log(routing)
 
 module.exports = {
     makeJson,

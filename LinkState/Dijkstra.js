@@ -67,14 +67,17 @@ const get_route = (target, route_tree, src) => {
     if (target === src) return [[target], 0]
 
     const cost = route_tree[target][0]
-    const steps = [route_tree[target][1]]    
+    const steps = [route_tree[target][1]]   
+
+    const [new_steps, _] = get_route(route_tree[target][1])
+    return [steps, cost]
 
     while (true) {
-        if (steps[-1] == target) {
+        if (steps[steps.length-1] == target) {
             return [steps, cost]
         }
 
-        steps.push(route_tree[steps[-1]][1])
+        steps.push(route_tree[steps[steps.length-1]][1])
     }
 }
 
