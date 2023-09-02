@@ -102,7 +102,6 @@ class Node {
                     // si no estoy en la lista y no soy en destinatario me agrego y envio el mensaje por flood a mis neighbors y reduzco el hopCount.
                     hopCount = hopCount - 1
                     receivers.push(this.name)
-                    from = this.name
 
                     const paquete = {
                         type: messageType,
