@@ -1,17 +1,11 @@
-const { dijkstra } = require('./Dijkstra')
-
+const { Dijkstra } = require('./Dijkstra')
+const { makeJson, make_disc_msg, build_graph } = require('./LS')
 const {
     input,
     print,
     intInput,
     show_discover,
 } = require('./util')
-
-const {
-    makeJson,
-    make_disc_msg,
-    build_graph
-} = require('./LS')
 
 const menu_discover = '\n' + 
     '---------------------------- \n' +
@@ -77,26 +71,73 @@ const main = async () => {
         }
     }
 
-    print('\n---- Fase Calculo de tablas de enrutamiento ----')
-    print('Topologia completa ingresada:')
-    show_discover(topology)
+    print('\n---- Fase Calculo de tablas de enrutamiento ----\n')
 
-    const graph = build_graph(topology)
-
-    return
-    print('Se calculo la tabla de ruteo exitosamente')
-    dijkstra(graph, 0)
+    const [graph, index_map] = build_graph(topology)
+    const Dijkstra_calc = new Dijkstra() 
+    Dijkstra_calc.build_routing(graph)
+    print('\n> Se calculo la tabla de ruteo exitosamente')
 
     print('---- Fase de envio de mensajes ----')
+    const reverse_map = Object.entries(index_map).map(([key, value]) => [value, key])
     let option_msg
 
     while (option_msg != 's') {
         option_msg = await input(menu_msg)
 
-        if (finish_discover === '1') {
-            //TODO HANDLE enviar mensaje
-        } else if (finish_discover === '2') {
-            //TODO HANDLE Recibir mensaje
+        if (option_msg === '1') {
+            const destin = await input('Ingrese destinatario: ')
+            const payload = await input('Ingrese Payload: ')
+
+            // Calcular ruta
+            const [steps, cost] = Dijkstra_calc.get_route(index_map[destin], index_map[node_name])
+            
+            // Preparar prints
+            const str_steps = steps.map(node => reverse_map[node][1])
+                .reduce((acc, value) => acc + ' -> ' + value, '')
+            const to_send_msg = JSON.stringify(makeJson('message', node_name, destin, payload))
+
+            //prints
+            print('---- Ruta calculada ----')
+            print('Ruta a seguir' + str_steps)
+            print('Costo:', cost)
+            console.log('Enviar mensaje a:', reverse_map[steps[1]][1])
+
+            print('Mensaje a Enviar:')
+            print(to_send_msg)
+
+        } else if (option_msg === '2') {
+            const msg = await input('Ingrese el mensaje entrante: ')
+            const json_msg = JSON.parse(msg)
+            const to = json_msg.headers.to
+
+            if (to == node_name) {
+                print('mensaje recibido de', json_msg.headers.from)
+                print('>', json_msg.payload)
+
+            } else {
+                const [destin, src] = [index_map[to], index_map[node_name]]
+                const [steps, cost] = Dijkstra_calc.get_route(destin, src)
+
+                const str_steps = steps.map(node => reverse_map[node][1])
+                    .reduce((acc, value) => acc + ' -> ' + value, '')
+
+                print('---- Reenviar mensaje ----')
+                print('Ruta a seguir' + str_steps)
+                print('Costo faltante:', cost)
+
+                print('Reenviar mensaje a:', reverse_map[steps[1]][1])
+                const to_send_msg =
+                    JSON.stringify(makeJson(
+                        'message',
+                        json_msg.headers.from,
+                        to,
+                        json_msg.payload,
+                        json_msg.headers.hop_count + 1
+                    ))
+
+                print(to_send_msg)
+            }
         }
     }
 
@@ -104,3 +145,4 @@ const main = async () => {
 }
 
 main()
+

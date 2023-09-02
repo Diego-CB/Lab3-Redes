@@ -1,6 +1,19 @@
 const readline = require('readline');
 const filesystem = require('fs');
 
+let topology;
+let n_vecinos;
+let contadorVecinos = 0;
+let myvector;
+let nodos;
+let myIndex;
+let myName;
+let globResponse = {
+  "type" : "info",
+  "headers" : {"from":"", "to":"", "hop_count":0},
+  "payload" : []
+}
+
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
 const rl = readline.createInterface({
@@ -46,40 +59,81 @@ function xmppConnection(username, password) {
   })
 }
 
+function addMyVector(myvector){
+  globResponse.payload[myIndex] = myvector
+  
+  console.log(globResponse)
+}
+
+function agregarVecino() {
+  // Si ya hemos llegado al máximo, terminamos
+  if (contadorVecinos >= nodos.length-1) {
+    console.log("Has alcanzado el límite de vecinos.");
+    console.log("Array final:", myvector);
+    addMyVector(myvector);
+    rl.close();
+    return;
+  }
+  // Si ya hemos llegado al máximo, terminamos
+  rl.question("Nombre del vecino: ", nombre => {
+    if (nodos.includes(nombre)){
+      rl.question("Costo del vecino: ", costo => {
+        const costoNumerico = parseInt(costo, 10);
+        if (isNaN(costoNumerico)) {
+          console.log("Por favor, introduce un número válido para el costo.");
+        } else {
+          myvector[nodos.indexOf(nombre)] = costo;
+          contadorVecinos++;
+        }
+        
+        // Preguntar si se quiere continuar agregando vecinos
+        rl.question("¿Quieres agregar otro vecino? (Y/N): ", respuesta => {
+          if (respuesta.toLowerCase() === 'y') {
+            agregarVecino();
+          } else {
+            console.log("Array final:", myvector);
+            addMyVector(myvector);
+            console.log(globResponse)
+            rl.close();
+          }
+        });
+      });
+    } else {
+      console.log('El nodo no existe');
+      agregarVecino();
+    }
+  });
+}
+
 
 function promptMenu() {
   rl.question('Que nodo soy? ', nodeid => {
-
+    globResponse.headers.from = nodeid;
     filesystem.readFile('./DV/topology.json', 'utf8', (err, data) => {
       if (err) {
         console.log(`Error leyendo el archivo desde el disco: ${err}`);
       } else {
-        const json = JSON.parse(data);
-        let nodos = json.nodos
+        topology = JSON.parse(data);
+        nodos = topology.nodos
+        
+        //Agregar los vectores de todos los nodos
+        for (let i = 0; i < nodos.length; i++) {
+          let newarr = new Array(nodos.length).fill(0);
+          globResponse.payload.push(newarr)
+        }
         if (nodos.includes(nodeid)) {
-          console.log('El nodo existe')
-          console.log(nodos);
-          indexnode = nodos.indexOf(nodeid)
-          let table = []
-          let myTable = []
-          for (let i = 0; i < nodos.length; i++) {
-            if (i == indexnode) {
-              table.push(json.topologia[i])
-            } else {
-              table.push(new Array(nodos.length).fill('∞'))
+          myIndex = nodos.indexOf(nodeid)
+          //'El nodo existe'
+          myvector = new Array(nodos.length).fill(0);
+          rl.question(`Quieres agregar un vecino? (Y/N)`, addvec => {
+            if(addvec.toLowerCase() === 'y') {
+              agregarVecino()
+            }else {
+              rl.close();
             }
-            myTable.push(json.topologia[i])
-          }
-          console.log('')
-          for (const elemento of table) {
-            console.log(`| ${elemento} |`);
-          }
-          console.log('')
-          for (const elemento of myTable) {
-            console.log(`| ${elemento} |`);
-          }
+          })
         } else {
-          console.log('El nodo no existe')
+          console.log('El nodo no existe');
         }
       }
     });
