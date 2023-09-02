@@ -7,7 +7,7 @@ let contadorVecinos = 0;
 let myvector;
 let nodos;
 let myIndex;
-let myName;
+let myVecinos = [];
 let globResponse = {
   "type" : "info",
   "headers" : {"from":"", "to":"", "hop_count":0},
@@ -61,8 +61,12 @@ function xmppConnection(username, password) {
 
 function addMyVector(myvector){
   globResponse.payload[myIndex] = myvector
-  
-  console.log(globResponse)
+  for (let i = 0; i < myVecinos.length; i++) {
+    globResponse.headers.to = myVecinos[i]
+    console.log(globResponse)
+    let stringPackage = JSON.stringify(globResponse);
+    console.log(stringPackage)
+  }
 }
 
 function agregarVecino() {
@@ -77,12 +81,13 @@ function agregarVecino() {
   // Si ya hemos llegado al máximo, terminamos
   rl.question("Nombre del vecino: ", nombre => {
     if (nodos.includes(nombre)){
+      myVecinos.push(nombre)
       rl.question("Costo del vecino: ", costo => {
         const costoNumerico = parseInt(costo, 10);
         if (isNaN(costoNumerico)) {
           console.log("Por favor, introduce un número válido para el costo.");
         } else {
-          myvector[nodos.indexOf(nombre)] = costo;
+          myvector[nodos.indexOf(nombre)] = costoNumerico;
           contadorVecinos++;
         }
         
@@ -93,7 +98,6 @@ function agregarVecino() {
           } else {
             console.log("Array final:", myvector);
             addMyVector(myvector);
-            console.log(globResponse)
             rl.close();
           }
         });
@@ -114,7 +118,7 @@ function promptMenu() {
         console.log(`Error leyendo el archivo desde el disco: ${err}`);
       } else {
         topology = JSON.parse(data);
-        nodos = topology.nodos
+        nodos = topology.nodos;
         
         //Agregar los vectores de todos los nodos
         for (let i = 0; i < nodos.length; i++) {
@@ -129,7 +133,7 @@ function promptMenu() {
             if(addvec.toLowerCase() === 'y') {
               agregarVecino()
             }else {
-              rl.close();
+              promptMenu2();
             }
           })
         } else {
@@ -137,6 +141,19 @@ function promptMenu() {
         }
       }
     });
+  });
+}
+
+function promptMenu2() {
+  rl.question('Que quieres hacer ahora?\n1. Recibir vector\n2. Enviar mensaje\n', option => {
+    if (option == '1') {
+      rl.question('Ingrese el paquete', paquete => {
+        let jsonPackage = JSON.parse(paquete);
+        console.log(jsonPackage)
+      })
+    } else {
+      rl.close()
+    }
   });
 }
 
