@@ -1,8 +1,17 @@
+/*
+Universidad del Valle de Guatemala
+Redes
+Cristian Aguirre 20231
+Flooding.js
+*/
+
 const readline = require('readline');
 const filesystem = require('fs');
+const bf = require('./bellman-ford')
+const { updateRoutingTable } = bf;
 
+// Variables globales
 let topology;
-let n_vecinos;
 let contadorVecinos = 0;
 let myvector;
 let nodos;
@@ -59,8 +68,8 @@ function xmppConnection(username, password) {
   })
 }
 
-function addMyVector(myvector){
-  globResponse.payload[myIndex] = myvector
+// Funcion para imprimir y preparar paquetes para enviar a vecinos
+function outputPackage(){
   for (let i = 0; i < myVecinos.length; i++) {
     globResponse.headers.to = myVecinos[i]
     console.log(globResponse)
@@ -69,14 +78,22 @@ function addMyVector(myvector){
   }
 }
 
+//Funcion que anade el vector inicial del nodo que se esta ejecutando
+function addMyVector(myvector){
+  // Añadir mi vector a la respuesta global y llamar a outputPackage
+  globResponse.payload[myIndex] = myvector
+  outputPackage()
+  globResponse.headers.to = ''
+}
+
+// Función para agregar un vecino y actualizar mi vector
 function agregarVecino() {
   // Si ya hemos llegado al máximo, terminamos
   if (contadorVecinos >= nodos.length-1) {
     console.log("Has alcanzado el límite de vecinos.");
     console.log("Array final:", myvector);
     addMyVector(myvector);
-    rl.close();
-    return;
+    promptMenu2();
   }
   // Si ya hemos llegado al máximo, terminamos
   rl.question("Nombre del vecino: ", nombre => {
@@ -98,7 +115,7 @@ function agregarVecino() {
           } else {
             console.log("Array final:", myvector);
             addMyVector(myvector);
-            rl.close();
+            promptMenu2();
           }
         });
       });
@@ -145,11 +162,43 @@ function promptMenu() {
 }
 
 function promptMenu2() {
-  rl.question('Que quieres hacer ahora?\n1. Recibir vector\n2. Enviar mensaje\n', option => {
+  rl.question('Que quieres hacer ahora?\n1. Recibir vector\n2. Enviar mensaje\n3. Recibir mensaje\n', option => {
     if (option == '1') {
-      rl.question('Ingrese el paquete', paquete => {
+      rl.question('Ingrese el paquete: ', paquete => {
         let jsonPackage = JSON.parse(paquete);
-        console.log(jsonPackage)
+        let newIndex = nodos.indexOf(jsonPackage.headers.from)
+        let newVector = jsonPackage.payload[newIndex]
+        let routingTable = globResponse.payload
+        globResponse.payload = updateRoutingTable(routingTable, newIndex, newVector)
+        outputPackage()
+        promptMenu2()
+      })
+    } else if (option == '2') {
+      globResponse.type = 'message'
+      rl.question('A quien quieres enviar el mensaje: ', to => {
+        if (nodos.includes(to)) {
+          globResponse.headers.to = to
+          rl.question('Ingrese el mensaje: ', message => {
+            globResponse.payload = message
+            console.log(globResponse)
+            console.log(JSON.stringify(globResponse))
+            promptMenu2()
+          })
+        } else {
+          console.log('El nodo no existe');
+        }
+      })
+    } else if (option == '3') {
+      rl.question('Ingrese el input: ', paquete => {
+        let jsonPackage = JSON.parse(paquete);
+        if (jsonPackage.headers.to == globResponse.headers.from) {
+          console.log('\nEl mensaje es ',jsonPackage.payload)
+        } else {
+          jsonPackage.headers.hop_count = jsonPackage.headers.hop_count + 1
+          console.log(jsonPackage)
+          console.log(JSON.stringify(jsonPackage))
+        }
+        promptMenu2()
       })
     } else {
       rl.close()
