@@ -38,11 +38,11 @@ class Dijkstra {
         route_tree[src] = [0, src]
         
         // Find shortest path for all vertices (except src)
-        for(let _ = 0; _ < this.V - 1; _++) {
+        for (let _ = 0; _ < this.V - 1; _++) {
             const actual_node = this.min_distance(route_tree, visited_list)        
             visited_list.push(actual_node)
             
-            for(let v = 0; v < this.V; v++) {
+            for (let v = 0; v < this.V; v++) {
                 if (
                     this.graph[actual_node][v] > 0 &&
                     route_tree[actual_node][0] < Number.MAX_VALUE &&
@@ -59,6 +59,10 @@ class Dijkstra {
         return route_tree
     }
 
+    /**
+     * Builds the rputing tables for all the nodes in topology
+     * @param {Array[Array[number]]} graph adyascence graph of the topology
+     */
     build_routing(graph) {
         this.V = graph.length
         this.routing_table = []
