@@ -38,6 +38,7 @@ const main = async () => {
 
     let finish
     const node = new LS_Node(node_name)
+    await node.login()
 
     while (finish !== 's') {
         finish = await input(menu_msg)

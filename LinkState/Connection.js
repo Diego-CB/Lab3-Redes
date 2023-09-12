@@ -82,8 +82,14 @@ class LS_Node {
 
                 // Recibir nuevos mensajes de descubrimiento
                 } else if (json_body.type === 'info') {
+                    // Recibir mensaje
                     const [to, cost] = json_body.payload.split('->')
+
+                    // Recalcular tablas de ruteo
                     this.topology.push({from, to, cost})
+                    this.build_table()
+
+                    // Reenviar mensaje de descrubrimiento a vecinos
                     this.neighbors.map(node => this.send(`G4_${node}@alumchat.xyz`), body)
                 }
             }
