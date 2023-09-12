@@ -57,9 +57,10 @@ const show_discover = async (desc_msg) => {
 }
 
 const fs = require('fs')
-const read_file = filepath => {
-    const data = fs.readFileSync(filepath, 'utf8' )
-    return JSON.parse(data)
+const read_file = async filepath => {
+    const data = await fs.readFileSync(filepath, 'utf8' )
+    const parsed_data = JSON.parse(data)
+    return parsed_data
 }
 
 module.exports = {

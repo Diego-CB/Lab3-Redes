@@ -33,12 +33,10 @@ const make_disc_msg = (topology) => {
     topology.map(node => {
         const node_name = node.from
         const name = node.to
-        const cost = node.cost
 
         topology.map(next_node => {
-            
             if (next_node.to !== name) {
-                let msg_json = makeJson('info', node_name, next_node.to, `${name}->${cost}`)
+                let msg_json = makeJson('info', node_name, next_node.to, `${node_name}->${name}`)
                 msg_json = JSON.stringify(msg_json)
                 desc_msg.push(msg_json)
             }

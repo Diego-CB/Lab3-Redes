@@ -5,19 +5,26 @@ const { Dijkstra } = require('./Dijkstra')
 
 class LS_Node {
     constructor(node_name) {
-        this.adress_map = read_file('./names-g4.txt').config
         this.node_name = node_name
-        this.username = this.adress_map[node_name]
-        this.neighbors = read_file('./topo-g4.txt').config[node_name]
+        this.xmpp = undefined
+        this.password = 'redes2023'
+    }
+
+    async init() {
+        // Leer archivos
+        this.adress_map = (await read_file('./names-g4.txt'))['config']
+        this.username = this.adress_map[this.node_name].toLowerCase()
+        this.neighbors = (await read_file('./topo-g4.txt'))['config'][this.node_name]
+
+        // Llenar topologia
         this.topology = []
         this.neighbors.map((node) => this.topology.push({
-            from: node_name,
+            from: this.node_name,
             to: node,
             cost: 1,
         }))
-        console.log(this.topology)
-        this.password = 'redes2023'
-        this.xmpp = undefined
+
+        // construir tabla
         this.Dijkstra_calc = new Dijkstra()
         this.build_table()
     }
@@ -31,19 +38,26 @@ class LS_Node {
     }
 
     #restart_xmpp() {
-        return client({
+        const cleint_info = {
             service: 'xmpp://alumchat.xyz:5222',
             domain: 'alumchat.xyz',
-            username: this.username,
+            username: this.username.split('@')[0],
             password: this.password,
             terminal: true,
             tls: {
                 rejectUnauthorized: false
             },
-        })
+        }
+        return client(cleint_info)
+    }
+
+    async disconnect() {
+        await this.xmpp.stop()
+        print('> Desconectado del server')
     }
 
     async login() {
+        print('> Iniciando Login en el server')
         this.xmpp = this.#restart_xmpp()
 
         // Notificaciones
@@ -51,18 +65,21 @@ class LS_Node {
             // Recibir mensajes directos
             if (stanza.is('message') && stanza.attrs.type == 'chat') {
                 const body = stanza.getChildText('body')
-                const json_body = Json.parse(body)
-                const from = json_body.headers.from
+                const json_body = JSON.parse(body)
+                console.log(json_body)
+                if (json_body.headers.algorithm === 'LS') {
 
-                // Recibir mensajes
-                if (json_body.type === 'message') {
-                    const to = json_body.headers.to
-
-                    // Recibir mensaje
-                    if (to == this.node_name) {
-                        print('> Se recibio mensaje de', from)
-                        print(json_msg.payload)
-
+                    const from = json_body.headers.from
+                    
+                    // Recibir mensajes
+                    if (json_body.type === 'message') {
+                        const to = json_body.headers.to
+                        
+                        // Recibir mensaje
+                        if (to == this.node_name) {
+                            print('> Se recibio mensaje de', from)
+                            print(json_body.payload)
+                            
                     // Reenviar mensaje (ruteo)
                     } else {
                         const [destin, src] = [this.index_map[to], this.index_map[this.node_name]]
@@ -70,27 +87,33 @@ class LS_Node {
         
                         const to_send_msg = JSON.stringify(makeJson(
                             'message',
-                            json_msg.headers.from,
+                            json_body.headers.from,
                             to,
-                            json_msg.payload,
-                            json_msg.headers.hop_count + 1
-                        ))
+                            json_body.payload,
+                            json_body.headers.hop_count + 1
+                            ))
                             
-                        await this.send(`G4_${to}@alumchat.xyz`, to_send_msg)
-                        print('> Se reenvio mensaje a:', this.reverse_map[steps[1]][1])
+                            await this.send(`G4_${to}@alumchat.xyz`, to_send_msg)
+                            print('> Se reenvio mensaje a:', this.reverse_map[steps[1]][1])
+                        }
+                        
+                        // Recibir nuevos mensajes de descubrimiento
+                    } else if (json_body.type === 'info') {
+                        // Recibir mensaje
+                        const [from, to] = json_body.payload.split('->')
+                        print('> Mensaje de descubrimiento recibido de', from)
+                        console.log(json_body)
+                        
+                        // Recalcular tablas de ruteo
+                        this.topology.push({from, to, cost: 1})
+                        this.build_table()
+                        
+                        const to_send = json_body
+                        to_send.headers.from = this.node_name
+                        
+                        // Reenviar mensaje de descrubrimiento a vecinos
+                        this.neighbors.map(node => node != from && this.send(`G4_${node}@alumchat.xyz`, body))
                     }
-
-                // Recibir nuevos mensajes de descubrimiento
-                } else if (json_body.type === 'info') {
-                    // Recibir mensaje
-                    const [to, cost] = json_body.payload.split('->')
-
-                    // Recalcular tablas de ruteo
-                    this.topology.push({from, to, cost})
-                    this.build_table()
-
-                    // Reenviar mensaje de descrubrimiento a vecinos
-                    this.neighbors.map(node => this.send(`G4_${node}@alumchat.xyz`), body)
                 }
             }
         })
@@ -109,8 +132,7 @@ class LS_Node {
             this.xmpp.on('error', (err) => {
                 reject(err)
             })
-            
-            
+
             this.xmpp.start().catch(reject)
         })
     }
@@ -118,8 +140,10 @@ class LS_Node {
     async send_discover() {
         this.disc_msg = make_disc_msg(this.topology)
         await this.disc_msg.map(async msg => {
-            const to = JSON.parse(msg).headers.to
-            await this.send(`G4_${to}@alumchat.xyz`, msg)
+            const to_send = JSON.parse(msg)
+            to_send.headers.algorithm = 'LS'
+            const to = to_send.headers.to
+            await this.send(`g4_${to}@alumchat.xyz`, JSON.stringify(to_send))
         })
         print('> Se enviaron los mensajes de descubrimiento a los nodos vecinos')
     }
