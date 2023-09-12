@@ -56,9 +56,16 @@ const show_discover = async (desc_msg) => {
     await input('\nPresione ENTER para continuar')
 }
 
+const fs = require('fs')
+const read_file = filepath => {
+    const data = fs.readFileSync(filepath, 'utf8' )
+    return JSON.parse(data)
+}
+
 module.exports = {
     input,
     print,
     intInput,
-    show_discover
+    show_discover,
+    read_file,
 }
