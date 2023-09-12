@@ -1,6 +1,8 @@
 const readline = require('readline');
 const filesystem = require('fs');
 const { client, xml } = require('@xmpp/client');
+const bf = require('./bellman-ford');
+const { bellmanFord } = bf;
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -12,7 +14,15 @@ const rl = readline.createInterface({
 let currentContactJid = null;
 let myJID = null;
 let sessionId;
-
+let globResponse = {
+  type : "",
+  headers : {from:"", to:"", algorithm: 'Distance Vector'},
+  payload : []
+}
+let topoJson;
+let namesJson;
+let identifier;
+let counter = 0;
 
 function getStatus(show){
   switch (show) {
@@ -91,7 +101,7 @@ function readTopologyFile(route) {
 }
 
 function showMenu(xmpp) {
-  rl.question('Choose an option:\n1. View Contacts\n2. Add New Contact\n3. Show Contact Details\n4. Send Message\n5. Group Message\n6. Change Status\n7. Log Out\n8. Delete Account\n', option => {
+  rl.question('Escoge una opcion:\n1. Iniciar descubrimiento\n2. Enviar mensaje\n3. Cerrar sesion\n', option => {
     switch (option.trim()) {
       case '1': //Mostrar todos los contactos y sus estados
         xmpp.send(
@@ -103,38 +113,6 @@ function showMenu(xmpp) {
         );
         break;
       case '2':
-        // Agregar un nuevo contacto
-        rl.question('Ingresa el JID del contacto que deseas agregar (ejemplo: usuario@alumchat.xyz): ', newContactJid => {
-          rl.question('Name for your contact: ', contactName => {
-            if (!newContactJid.includes('@')) {
-                newContactJid = newContactJid + '@alumchat.xyz'
-              } 
-              // Solicita agregar el contacto al roster (lista de contactos)
-              const subscribeStanza = xml('presence', { to: newContactJid, type: 'subscribe', id:contactName });
-              xmpp.send(subscribeStanza);
-              console.log(`Solicitud de subscripcion enviada a ${newContactJid}`)
-              showMenu(xmpp);
-            })
-        });
-        break;
-      case '3': //Mostrar detalle de contacto 
-        rl.question('Ingresa el JID del contacto que deseas ver (ejemplo: usuario@alumchat.xyz): ', contactJid => {
-          currentContactJid = contactJid
-          const contactDetailRequest = xml(
-            'iq',
-            { type: 'get', id: 'roster_detail' },
-            xml('query', { xmlns: 'jabber:iq:roster' })
-          );
-          xmpp.send(contactDetailRequest);
-          if (!contactJid.includes('@')) {
-            contactJid = contactJid + '@alumchat.xyz'
-          } 
-          // const presenceProbe = xml('presence', { type: 'probe', to: contactJid, from:myJID, id:'probe' });
-          // xmpp.send(presenceProbe);
-        });
-        showMenu(xmpp);
-        break;
-      case '4':
         console.log(`${'-'.repeat(80)}\n`)
         rl.question('Ingresa el JID del contacto al que deseas enviar un mensaje: ', toJid => {
           rl.question('Choose an option: \n1. Send text message\n2. Send .txt file\n3. Leave\n', option => {
@@ -148,97 +126,15 @@ function showMenu(xmpp) {
                 console.log(`\n${'-'.repeat(80)}\n\tEl mensaje se ha enviado correctamente! :D\n${'-'.repeat(80)}`)
                 showMenu(xmpp);
               });
-            } else if (option == '2') {
-              rl.question('Enter the file path: ', async filepath => {
-                const file = filesystem.readFileSync(filepath, { encoding: 'base64' })
-                const payload = filepath.replace('./', '')
-                await xmpp.send(
-                  xml(
-                      'message',
-                      { to: toJid, type: 'chat' },
-                      xml('body', {}, payload),
-                      xml('attachment', { 
-                          xmlns: 'urn:xmpp:attachment',
-                          id: 'attachment1',
-                          encoding: 'base64'
-                      }, file)
-                  )
-                )
-                console.log(`File sent to: ${toJid}`)
-                showMenu(xmpp);
-              })
-            } else {
+            }  else {
               showMenu(xmpp);
             }
           })
         });
         break;
-      case '5':
-        console.log(`${'-'.repeat(80)}\n`)
-        rl.question('Enter the name of the group chat: ', async roomId => {
-          const roomJid = `${roomId}@conference.alumchat.xyz`;
-          const myNick = myJID;
-          const createRoomStanza = xml('presence', { to: `${roomJid}/${myNick}` });
-          await xmpp.send(createRoomStanza);
-
-          rl.question('Enter your message: ', async groupMessage => {
-            const groupMessageStanza = xml('message', { to: roomJid, type: 'groupchat' }, xml('body', {}, groupMessage));
-            await xmpp.send(groupMessageStanza);
-            showMenu(xmpp);
-          })
-          
-
-        });
-        break;
-      case '6':
-        console.log(`\n${'-'.repeat(80)}`)
-        rl.question('Que estado desea establecer? \n1. Available\n2. Away\n3. Not available\n4. Busy\n', statusOption => {
-          let statusValue;
-          switch (statusOption.trim()) {
-            case '1':
-              statusValue = 'chat'
-              break
-            case '2':
-              statusValue = 'away'
-              break
-            case '3':
-              statusValue = 'xa'
-              break
-            case '4':
-              statusValue = 'dnd'
-              break
-          }
-          console.log(`${'-'.repeat(80)}`)
-          rl.question('Status Message: ', async statusMessage => {
-            await xmpp.send(xml('presence', {type:'available', id:'normalpresence'},  xml('show',{}, statusValue),xml('status', {}, statusMessage)));
-            console.log(`The account status was set to ${statusValue} successfully.`)
-            console.log(`${'-'.repeat(80)}`)
-            setTimeout(() => {
-              showMenu(xmpp);
-            }, 500);
-          });
-        });
-        break;
-      case '7': //Cerrar sesion
+      case '3': //Cerrar sesion
         xmpp.send(xml('presence', {type: 'unavailable', id:'normalpresence'}));
         xmpp.stop();
-        break;
-      case '8': //Borrar Cuenta
-        rl.question('Enter your password to confirm: ', pass => {
-          xmpp.send(xml('presence', {type: 'unavailable', id:'normalpresence'}));
-          console.log('🗑️ Your account has been deleted!')
-          xmpp.send(
-            xml(
-            'iq', 
-            { type: 'set', id: 'delete-account'},
-            xml('query', { xmlns: 'jabber:iq:register' },
-            xml("username", {}, sessionId),
-            xml("password", {}, pass),
-            xml("remove"),
-            ))
-          )
-          xmpp.stop();
-        });
         break;
       default:
         console.log('Opción no reconocida. Por favor, intenta de nuevo.');
@@ -248,13 +144,69 @@ function showMenu(xmpp) {
   });
 };
 
+function matricesAreDifferent(matrix1, matrix2) {
+
+  // Verificar si ambas matrices tienen el mismo número de filas
+  if (matrix1.length !== matrix2.length) {
+    return true;
+  }
+
+  // Iterar sobre cada fila
+  for (let i = 0; i < matrix1.length; i++) {
+      // Verificar si ambas filas tienen el mismo número de columnas
+      if (matrix1[i].length !== matrix2[i].length) {
+        return true;
+      }
+
+      // Iterar sobre cada columna
+      for (let j = 0; j < matrix1[i].length; j++) {
+          if (matrix1[i][j] !== matrix2[i][j]) {
+            return true;
+          }
+      }
+  }
+
+  // Si todas las comprobaciones pasan, las matrices son iguales
+  return false;
+}
+
+function matricesAreEqual(matrix1, matrix2) {
+  // Verificar si ambas matrices tienen el mismo número de filas
+  if (matrix1.length !== matrix2.length) {
+    return false;
+  }
+
+  // Iterar sobre cada fila
+  for (let i = 0; i < matrix1.length; i++) {
+      // Verificar si ambas filas tienen el mismo número de columnas
+      if (matrix1[i].length !== matrix2[i].length) {
+        return false;
+      }
+
+      // Iterar sobre cada columna
+      for (let j = 0; j < matrix1[i].length; j++) {
+          // console.log(`${matrix1[i][j]} !== ${matrix2[i][j]}?`)
+          if (matrix1[i][j] !== matrix2[i][j]) {
+            return false;
+          }
+      }
+  }
+
+  // Si todas las comprobaciones pasan, las matrices no son iguales
+  return true;
+}
+
+
 //Cliente----------------------------------
   
 function xmppConnection(username, password) {
     process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
     const domainName = 'alumchat.xyz'
-    myJID = username + '@alumchat.xyz'
-    sessionId = username + '@alumchat.xyz'
+    myJID = username.toUpperCase() + '@alumchat.xyz'
+    sessionId = username.toUpperCase() + '@alumchat.xyz'
+    let myTable
+    
+    globResponse.headers.from = sessionId
 
     // Creando el cliente XMPP
     const xmpp = client({
@@ -272,19 +224,57 @@ function xmppConnection(username, password) {
       console.error('❌', err.toString());
     });
     xmpp.on('online', async (address) => {
-        console.log('🟢 Connected as', (username + 'alumchat.xyz'));
+        console.log('🟢 Connected as', (username.toUpperCase() + '@alumchat.xyz'));
         xmpp.send(xml('presence',{type:'available', id:'normalpresence'}, xml('show', {}, 'chat')));
-        let names;
+        try {
+            namesJson = await readTopologyFile('names-g4');
+            // console.log(names);
+        } catch (error) {
+            console.log(error);
+        }
 
-        readTopologyFile()
-            .then(data => {
-                names = data;
-                console.log(topology);
-            })
-            .catch(error => {
-                console.log(error);
-            });
-        console.log(names)
+        //Encuentra el nombre del nodo
+        for (let key in namesJson.config) {
+            console.log(namesJson.config[key], username)
+            
+            if (namesJson.config[key] === sessionId) {
+                identifier = key;
+                break;
+            }
+        }
+
+        try {
+            topoJson = await readTopologyFile('topo-g4');
+            // console.log(names);
+        } catch (error) {
+            console.log(error);
+        }
+
+        const positionNodes = Object.keys(topoJson.config) // Ex. [A, B, C, D, E, F...]
+        const MyIndex = positionNodes.indexOf(identifier);
+
+        let vecinos = topoJson.config[identifier]
+        let table = [];
+
+        let nodosNum = Object.keys(topoJson.config).length
+        for (let i = 0; i < nodosNum; i++) {
+          table.push(new Array(nodosNum).fill(999))
+        }
+
+
+        //Construir mi vector
+        for (let i = 0; i < positionNodes.length; i++) {
+          if (vecinos.includes(positionNodes[i])) {
+            table[MyIndex][i] = 1;
+          }
+        }
+        // console.log('Im',identifier, 'This is my vector')
+        // console.log(table)
+        myTable = table
+
+
+      
+
         showMenu(xmpp);
     });
   
@@ -295,18 +285,43 @@ function xmppConnection(username, password) {
   
     xmpp.start().then(()=>{
       xmpp.on('stanza', async (stanza) => {
-        // console.log('📝 Stanza recibida:', stanza.toString(), stanza.attrs.id);
         if (stanza.is('message')) {
             if (stanza.attrs.type === 'chat') {
-              console.log('se recibio algo ')
               const from = stanza.attrs.from;  // Quién envió el mensaje
-              const body = stanza.getChildText('body');  // Contenido del mensaje
-              if (body) { // Algunos mensajes pueden no tener cuerpo, por lo que es importante verificar
-                console.log(`${'-'.repeat(80)}`)
-                console.log('Direct Chat')
-                console.log(`${'-'.repeat(80)}`)  
-                console.log(`📩 Message from ${from}: \n\t${body}`);
-              }
+              // if (from !== sessionId.toLowerCase()+'/CristianAguirreClient') {
+                const body = stanza.getChildText('body');  // Contenido del mensaje
+                if (body) { // Algunos mensajes pueden no tener cuerpo, por lo que es importante verificar
+                  let parsedBody = JSON.parse(body)
+                  let payload = parsedBody.payload
+                  if (parsedBody.type === 'info' && parsedBody.headers.algorithm === 'Distance Vector') {
+                    console.log(`📩 Message from ${from}:`);
+                    counter+=1
+                    
+                    receivedTable = payload
+                    copyMyTable = myTable.map(row => [...row]);
+                    console.log('Mi tabla es',myTable)
+                    newTable = await bellmanFord(copyMyTable,receivedTable)
+                    
+                    console.log(matricesAreEqual(myTable,newTable))
+
+                    console.log('La nueva tabla es',newTable)
+
+                    // if (!matricesAreEqual(myTable,newTable)) {
+                    if (counter <= 500) {
+                      // console.log('Hubo cambios, se va a enviar')
+                      myTable = newTable
+                      await xmpp.send(
+                        xml(
+                          'iq',
+                          { type: 'get', id: 'roster_contacts' },
+                          xml('query', { xmlns: 'jabber:iq:roster' })
+                        )
+                      );
+                    }
+                  }
+                }
+              // }
+              
               
               
               const coded_data = stanza.getChildText('attachment')
@@ -320,14 +335,13 @@ function xmppConnection(username, password) {
             } else if (stanza.attrs.type === 'groupchat') {
               const from = stanza.attrs.from; // Quién envió el mensaje
               const body = stanza.getChildText('body'); // Contenido del mensaje
-              if (body) {
-                console.log(`${'-'.repeat(80)}`)
-                console.log('Group Chat')
-                console.log(`${'-'.repeat(80)}`)  
-                console.log(`📩 Group Message from ${from}: \n\t${body}`);
-              }
+              // if (body) {
+              //   console.log(`${'-'.repeat(80)}`)
+              //   console.log('Group Chat')
+              //   console.log(`${'-'.repeat(80)}`)  
+              //   console.log(`📩 Group Message from ${from}: \n\t${body}`);
+              // }
             }
-            console.log(`${'-'.repeat(80)}`)
             
         }
 
@@ -353,7 +367,6 @@ function xmppConnection(username, password) {
                 )
             );
             xmpp.send(rosterAddStanza);
-            console.log(`🔔 You are now suscribed with ${stanza.attrs.id}|${fromJid}`);
           } 
           
           
@@ -365,19 +378,17 @@ function xmppConnection(username, password) {
 
             if (show != null){
               type = getStatus(show)
-              console.log(`${'-'.repeat(80)}`);
-              console.log(`🔔 ${from} is ${type}.`);
+              // console.log(`🔔 ${from} is ${type}.`);
               {status != null && console.log(`\tStatus message > ${status}`)}
-              console.log(`${'-'.repeat(80)}`);
             } else {
               if (type == 'unavailable') {
                 type = '⚪ Offline'
               } else {
                 type = '🟢 Available'
               }
-              console.log(`${'-'.repeat(80)}`);
-              console.log(`🔔 ${from} is ${type}.`);
-              console.log(`${'-'.repeat(80)}`);
+              // console.log(`${'-'.repeat(80)}`);
+              // console.log(`🔔 ${from} is ${type}.`);
+              // console.log(`${'-'.repeat(80)}`);
             }
           }// else {
           //   console.log('Stanza probe', stanza.toString())
@@ -389,48 +400,23 @@ function xmppConnection(username, password) {
         }
         
 
-        switch (stanza.attrs.id) {
-          case 'roster_contacts':
-            if (stanza.is('iq') && stanza.attrs.type === 'result') {
-              const query = stanza.getChild('query');
-              console.log(`\n${'-'.repeat(80)}\n\tContacts roster\n${'-'.repeat(80)}`)
-              if (query && query.attrs.xmlns === 'jabber:iq:roster') {
-                const contacts = query.getChildren('item');
-                if (contacts.length > 0){
-                  contacts.forEach(contact => {
-                    console.log('📇 ', contact.attrs.jid);
-                  });
-                } else {
-                  console.log('  You have no contacts....')
-                }
-                console.log(`${'-'.repeat(80)}`)
-                showMenu(xmpp);
-              }
+        if (stanza.is('iq') && stanza.attrs.type === 'result') {
+          const query = stanza.getChild('query');
+          if (query && query.attrs.xmlns === 'jabber:iq:roster') {
+            const contacts = query.getChildren('item');
+            if (contacts.length > 0){
+              contacts.forEach(async contact => {
+                globResponse.type = 'info'
+                globResponse.headers.to = contact.attrs.jid
+                globResponse.payload = myTable
+                // console.log(globResponse)
+                const messageStanza = xml('message', { to: contact.attrs.jid, type: 'chat' }, xml('body', {}, JSON.stringify(globResponse)));
+                await xmpp.send(messageStanza);
+                console.log('📇 Table sent to', contact.attrs.jid);
+              });
             }
-            break;
-          case 'roster_detail':
-            if (stanza.is('iq') && stanza.attrs.type === 'result') {
-              const query = stanza.getChild('query');
-              console.log(`\n${'-'.repeat(80)}\n\tResultado de busqueda\n${'-'.repeat(80)}`)
-              if (query && query.attrs.xmlns === 'jabber:iq:roster') {
-                const contacts = query.getChildren('item');
-                if (!currentContactJid.includes('@')) {
-                    currentContactJid = currentContactJid + '@' + domainName
-                } 
-                
-                const specificContact = contacts.find(contact => contact.attrs.jid === currentContactJid);
-                if (specificContact) {
-                    console.log('Name: ', specificContact.attrs.name);
-                    console.log('JID: ', specificContact.attrs.jid);
-                    console.log('Subscription: ', specificContact.attrs.subscription);
-                } else {
-                    console.log("Contact doesn't exist");
-                }
-                console.log(`${'-'.repeat(80)}\n`)
-                showMenu(xmpp);
-              }
-            }
-            break;
+            showMenu(xmpp);
+          }
         }
 
         // Manejar la respuesta del roster
@@ -446,41 +432,8 @@ function promptMenu() {
     switch (option.trim()) {
       case '1':
         rl.question('Enter your username: ', username => {
-          rl.question('Enter your password: ', async password => {
-            // xmppConnection(username, password);
-            let namesJson;
-            try {
-                namesJson = await readTopologyFile('names-g4');
-                // console.log(names);
-            } catch (error) {
-                console.log(error);
-            }
-
-            let identifier;
-
-            for (let key in namesJson.config) {
-                if (namesJson.config[key] === username) {
-                    identifier = key;
-                    break;
-                }
-            }
-
-            let topoJson;
-            try {
-                topoJson = await readTopologyFile('topo-g4');
-                // console.log(names);
-            } catch (error) {
-                console.log(error);
-            }
-            let vecinos = topoJson.config[identifier]
-            let table = [];
-
-            for (let vecino of vecinos) {
-                console.log(vecino)
-                table.push([vecino, 1,vecino])
-            }
-            console.log(table)
-          });
+          xmppConnection(username, 'redes2023');
+            
         });
         break;
       case '2':

@@ -29,6 +29,22 @@ const updateRoutingTable = (routingTable, newNodeIndex, newNodeVector) => {
   return routingTable;
 }
 
+const bellmanFord = (tableA, tableB) => {
+  const INF = 999;
+  const linkCost = 1; // Costo de enlace entre A y B
+
+  for (let i = 0; i < tableA.length; i++) {
+      for (let j = 0; j < tableA[i].length; j++) {
+          // Si pasando por B hay un camino más corto a j, actualizamos la tabla de A
+          if (tableA[i][j] > tableB[i][j] + linkCost) {
+              tableA[i][j] = tableB[i][j] + linkCost;
+          }
+      }
+  }
+  return tableA;
+}
+
 module.exports = {
-  updateRoutingTable
+  updateRoutingTable,
+  bellmanFord
 };
