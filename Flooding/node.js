@@ -118,11 +118,11 @@ class Node {
                         const messageBody = stanza.getChildText("body");
                         if (messageBody === null) {
 
-                            console.log(` >> The user ${contactJID} sent empty message.`)
+                            console.log(`\n------> The user ${contactJID} sent empty message.`)
 
                         } else {
 
-                            console.log(` >> New messages from ${contactJID}`);
+                            console.log(`\n------> New messages from ${contactJID}`);
 
                             try {
                                 const jsonObject = JSON.parse(messageBody);
@@ -130,45 +130,46 @@ class Node {
                                 let messageType = jsonObject.type;
                                 let from = jsonObject.headers.from;
                                 let to = jsonObject.headers.to;
-                                let hopCount = jsonObject.headers.hop_count;
                                 let receivers = jsonObject.headers.recievers;
                                 let payload = jsonObject.payload;
+                                let algorithm = jsonObject.alogorithm;
                     
-                                if (hopCount == 0){
-                                    console.log(' >> hop reached 0. no more flood')
+                                if (algorithm != 'Flooding'){
+                                    console.log(' >> Algorithm was not specified as Flooding. No action taken.')
                                 }else {
                                     if (from == this.name){
                                         console.log(` >> Message was sent by this user. No action needed.`);
-                                    }
-                                    // si estoy en la lista no hago nada
-                                    if (receivers.find(elemento => elemento === this.name)) {
-                                        console.log(` >> Message sent by ${contactJID} has been recieved already. No action needed. `);
                                     } else {
-                                        // revisar si soy el to
-                                        if (to == this.name){
-                                            console.log(` >> Message sent by ${contactJID} has been forwarded to you.\n     The message is: ${payload}`)
-                                            hopCount == 0
-                                            receivers.push(this.name)
+                                        // si estoy en la lista no hago nada
+                                        if (receivers.find(elemento => elemento === this.name)) {
+                                            console.log(`          >> Message sent by ${contactJID} has been recieved already. No action needed. `);
                                         } else {
-                                            // si no estoy en la lista y no soy en destinatario me agrego y envio el mensaje por flood a mis neighbors y reduzco el hopCount.
-                                            hopCount = hopCount - 1
-                                            receivers.push(this.name)
-                        
-                                            const paquete = {
-                                                type: messageType,
-                                                headers: {
-                                                    from: from,
-                                                    to: to,
-                                                    hop_count: hopCount,
-                                                    recievers: receivers
-                                                },
-                                                payload: payload
+                                            // revisar si soy el to
+                                            if (to == this.name){
+                                                console.log(`          >> Message sent by ${contactJID} has been forwarded to you. The message is: \n\n          ${payload}`)
+                                                receivers.push(this.name)
+                                            } else {
+                                                console.log(`          >> Message sent by ${contactJID} has been recieved and will now start flooding...`);
+                                                // si no estoy en la lista y no soy en destinatario me agrego y envio el mensaje por flood a mis neighbors.
+                                                receivers.push(this.name)
+                            
+                                                const paquete = {
+                                                    type: messageType,
+                                                    headers: {
+                                                        from: from,
+                                                        to: to,
+                                                        recievers: receivers,
+                                                        alogorithm: 'Flooding'
+                                                    },
+                                                    payload: payload
+                                                }
+                            
+                                                this.floodMessage(paquete)
+                            
                                             }
-                        
-                                            this.floodMessage(paquete)
-                        
                                         }
                                     }
+                                    
                                 }
                                 
                                 
@@ -331,18 +332,21 @@ class Node {
     con la que operaran los nodos.
     */
     async floodMessage(message) {
-        console.log(` >> Node ${this.name} is sending the message using Flooding Routing Algorithm:\n    >>>  ${message}`);
+        console.log('------------------------------------------------------------------------------------------')
+        console.log(` >> Node ${this.name} is sending the message using Flooding Routing Algorithm.`);
         this.neighbors.forEach(neighbor => {
 
             let neighborJID = this.adress_map[neighbor].toLowerCase()
 
-            console.log(` >> Message was sent to ${neighbor} by ${this.name}`);
+            console.log(`       - Message sent to ${neighbor} by ${this.name}`);
             const jsonString = JSON.stringify(message);
             console.log(`\n  >>${jsonString}`)
 
             this.sendMessagesDM(neighborJID, jsonString)
 
         });
+        console.log(`The message sent was:\n     ->${message}.`);
+        console.log('------------------------------------------------------------------------------------------')
     }
 
     /*

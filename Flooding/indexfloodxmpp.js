@@ -59,17 +59,17 @@ const handleRouting = async () => {
         switch (choice) {
             case 1:
                 console.log("Starting Flooding algorithm...");
-                const message = await input(' >> What message would you like to send:  ');
                 const dest = await input(' >> Who do you want to send the message to?\n     Enter the name:  ');
-                const hops = await input(' >> How many hops do you want the flooding to happen?\ Enter the ammount in numbers:  ');
-                const recievers = [loggedClient.name]
+                const message = await input(' >> What message would you like to send:  ');
+                const algorithm = 'Flooding';
+                const recievers = [loggedClient.name];
 
                 const paquete = {
                     type: "message",
                     headers: {
                         from: loggedClient.name,
                         to: dest,
-                        hop_count: hops,
+                        algorithm: algorithm,
                         recievers: recievers
                     },
                     payload: message
