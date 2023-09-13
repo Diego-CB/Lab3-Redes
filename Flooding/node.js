@@ -132,7 +132,9 @@ class Node {
                                 let to = jsonObject.headers.to;
                                 let receivers = jsonObject.headers.recievers;
                                 let payload = jsonObject.payload;
-                                let algorithm = jsonObject.alogorithm;
+                                let algorithm = jsonObject.headers.algorithm;
+
+                                console.log('>>>> ',algorithm)
                     
                                 if (algorithm != 'Flooding'){
                                     console.log(' >> Algorithm was not specified as Flooding. No action taken.')
