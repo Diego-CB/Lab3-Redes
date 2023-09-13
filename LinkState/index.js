@@ -41,14 +41,14 @@ const main = async () => {
 
         // Envia mensaje
         if (finish === '1') {
-            const nodo = await input('Ingrese nodo a enviar mensaje: ')
+            const destin = await input('Ingrese nodo a enviar mensaje: ')
             const msg = await input('Ingrese mensaje: ')
     
             const msg_json = {
                 type: 'message',
                 headers: {
                     from: node_name,
-                    to: nodo,
+                    to: destin,
                     hop_count: 0,
                     algorithm: 'LS'
                 },
@@ -56,7 +56,7 @@ const main = async () => {
             }
             const str_msg = JSON.stringify(msg_json)
     
-            node.send(`g4_${nodo}@alumchat.xyz`, str_msg)
+            node.send_routing(destin, str_msg)
         
         } else if (finish === '2') {
             await node.send_discover()
