@@ -2,7 +2,7 @@ const readline = require('readline');
 const filesystem = require('fs');
 const { client, xml } = require('@xmpp/client');
 const bf = require('./bellman-ford');
-const { bellmanFord } = bf;
+const { bellmanFord, updateDistanceVector } = bf;
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
 
@@ -23,6 +23,11 @@ let topoJson;
 let namesJson;
 let identifier;
 let counter = 0;
+let positionNodes;
+let MyIndex;
+
+let myTable
+let myRoutingTable = []
 
 function getStatus(show){
   switch (show) {
@@ -44,7 +49,33 @@ function getStatus(show){
   }
 }
 
+function getNextHop(destJID){
+  let hopJID
+  let neighID
+  let finalJID
+          //Encuentra el nombre del nodo
+  for (let key in namesJson.config) {
+    // console.log(namesJson.config[key],pfrom)
+    if (namesJson.config[key].toUpperCase() === destJID.toUpperCase()) {
+      neighID = key //El nombre del nodo ex. A
+      break;
+    }
+  }
 
+  let NeighIndex = positionNodes.indexOf(neighID);
+  let hopIndex = myRoutingTable[NeighIndex]
+  let hopID = positionNodes[hopIndex]
+
+  for (let key in namesJson.config) {
+    // console.log(namesJson.config[key],pfrom)
+    if (key === hopID) {
+      //Al que realmente le voy a enviar el paquete
+      hopJID = namesJson.config[key];
+      break;
+    }
+  }
+  return hopJID
+}
 
 function register(user, password){
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
@@ -101,40 +132,50 @@ function readTopologyFile(route) {
 }
 
 function showMenu(xmpp) {
-  rl.question('Escoge una opcion:\n1. Iniciar descubrimiento\n2. Enviar mensaje\n3. Cerrar sesion\n', option => {
+  rl.question('Escoge una opcion:\n1. Iniciar descubrimiento\n2. Enviar mensaje\n3. Cerrar sesion\n', async option => {
     switch (option.trim()) {
       case '1': //Mostrar todos los contactos y sus estados
-        xmpp.send(
-          xml(
-            'iq',
-            { type: 'get', id: 'roster_contacts' },
-            xml('query', { xmlns: 'jabber:iq:roster' })
-          )
-        );
+        for (let i = 0; i < Object.keys(topoJson.config).length - 1; i++) {
+          await xmpp.send(
+            xml(
+              'iq',
+              { type: 'get', id: 'roster_contacts' },
+              xml('query', { xmlns: 'jabber:iq:roster' })
+            )
+          );
+        }
+        
         break;
       case '2':
         console.log(`${'-'.repeat(80)}\n`)
         rl.question('Ingresa el JID del contacto al que deseas enviar un mensaje: ', toJid => {
-          rl.question('Choose an option: \n1. Send text message\n2. Send .txt file\n3. Leave\n', option => {
-            if (option == '1') {
-              rl.question('Enter your message: ', async messageText => {
-                if (!toJid.includes('@')) {
-                  toJid = toJid + '@alumchat.xyz'
-                } 
-                const messageStanza = xml('message', { to: toJid, type: 'chat' }, xml('body', {}, messageText));
-                await xmpp.send(messageStanza);
-                console.log(`\n${'-'.repeat(80)}\n\tEl mensaje se ha enviado correctamente! :D\n${'-'.repeat(80)}`)
-                showMenu(xmpp);
-              });
-            }  else {
-              showMenu(xmpp);
-            }
-          })
+          rl.question('Enter your message: ', async messageText => {
+            if (!toJid.includes('@')) {
+              toJid = toJid + '@alumchat.xyz'
+            } 
+            globResponse.headers.to = toJid
+            globResponse.payload = messageText
+            globResponse.type = 'message'
+            let nextHopJID = getNextHop(toJid)
+
+
+            const messageStanza = xml('message', { to: nextHopJID, type: 'chat' }, xml('body', {}, JSON.stringify(globResponse)));
+            await xmpp.send(messageStanza);
+            console.log(`\n${'-'.repeat(80)}\n\tEl mensaje se ha enviado correctamente! :D\n${'-'.repeat(80)}`)
+            
+            globResponse.type = 'info'
+            showMenu(xmpp);
+          });
         });
         break;
       case '3': //Cerrar sesion
         xmpp.send(xml('presence', {type: 'unavailable', id:'normalpresence'}));
         xmpp.stop();
+        break;
+      case '26': //Cerrar sesion
+        console.log(globResponse)
+        console.log('Routing table', myRoutingTable)
+        showMenu(xmpp);
         break;
       default:
         console.log('Opción no reconocida. Por favor, intenta de nuevo.');
@@ -204,7 +245,6 @@ function xmppConnection(username, password) {
     const domainName = 'alumchat.xyz'
     myJID = username.toUpperCase() + '@alumchat.xyz'
     sessionId = username.toUpperCase() + '@alumchat.xyz'
-    let myTable
     
     globResponse.headers.from = sessionId
 
@@ -212,7 +252,6 @@ function xmppConnection(username, password) {
     const xmpp = client({
       service: `xmpp://alumchat.xyz`,
       domain: 'alumchat.xyz',
-      resource: 'CristianAguirreClient',
       username: username,
       password: password,
       tls: {
@@ -235,7 +274,6 @@ function xmppConnection(username, password) {
 
         //Encuentra el nombre del nodo
         for (let key in namesJson.config) {
-            console.log(namesJson.config[key], username)
             
             if (namesJson.config[key] === sessionId) {
                 identifier = key;
@@ -250,8 +288,8 @@ function xmppConnection(username, password) {
             console.log(error);
         }
 
-        const positionNodes = Object.keys(topoJson.config) // Ex. [A, B, C, D, E, F...]
-        const MyIndex = positionNodes.indexOf(identifier);
+        positionNodes = Object.keys(topoJson.config) // Ex. [A, B, C, D, E, F...]
+        MyIndex = positionNodes.indexOf(identifier);
 
         let vecinos = topoJson.config[identifier]
         let table = [];
@@ -261,15 +299,18 @@ function xmppConnection(username, password) {
           table.push(new Array(nodosNum).fill(999))
         }
 
-
+        myRoutingTable = new Array(nodosNum).fill(999)
         //Construir mi vector
         for (let i = 0; i < positionNodes.length; i++) {
+          table[MyIndex][MyIndex] = 0;
+          myRoutingTable[MyIndex] = MyIndex
           if (vecinos.includes(positionNodes[i])) {
             table[MyIndex][i] = 1;
+            myRoutingTable[i] = i;
           }
         }
         // console.log('Im',identifier, 'This is my vector')
-        // console.log(table)
+        console.log(myRoutingTable)
         myTable = table
 
 
@@ -287,29 +328,45 @@ function xmppConnection(username, password) {
       xmpp.on('stanza', async (stanza) => {
         if (stanza.is('message')) {
             if (stanza.attrs.type === 'chat') {
-              const from = stanza.attrs.from;  // Quién envió el mensaje
+              let from = stanza.attrs.from;  // Quién envió el mensaje
+              let to = stanza.attrs.to;
               // if (from !== sessionId.toLowerCase()+'/CristianAguirreClient') {
                 const body = stanza.getChildText('body');  // Contenido del mensaje
                 if (body) { // Algunos mensajes pueden no tener cuerpo, por lo que es importante verificar
                   let parsedBody = JSON.parse(body)
-                  let payload = parsedBody.payload
                   if (parsedBody.type === 'info' && parsedBody.headers.algorithm === 'Distance Vector') {
-                    console.log(`📩 Message from ${from}:`);
-                    counter+=1
+                    let payload = parsedBody.payload
+                    let pfrom = from.split('/')[0]
+                    // counter+=1
                     
-                    receivedTable = payload
-                    copyMyTable = myTable.map(row => [...row]);
-                    console.log('Mi tabla es',myTable)
-                    newTable = await bellmanFord(copyMyTable,receivedTable)
+                    let neighID 
+                    //Encuentra el nombre del nodo
+                    for (let key in namesJson.config) {
+                      // console.log(namesJson.config[key],pfrom)
+                      if (namesJson.config[key].toUpperCase() === pfrom.toUpperCase()) {
+                        neighID = key;
+                        break;
+                      }
+                    }
+
+                    let NeighIndex = positionNodes.indexOf(neighID);
+
+                    // console.log(`📩 Message from ${pfrom} osea ${neighID} osea posicion ${NeighIndex}:`);
+                    // console.log(`El payload del nodo ${pfrom} es ${payload[NeighIndex]}`)
                     
-                    console.log(matricesAreEqual(myTable,newTable))
-
-                    console.log('La nueva tabla es',newTable)
-
-                    // if (!matricesAreEqual(myTable,newTable)) {
-                    if (counter <= 500) {
-                      // console.log('Hubo cambios, se va a enviar')
-                      myTable = newTable
+                    let table1 = myTable[MyIndex]
+                    let table2 = payload[NeighIndex]
+                    let result = updateDistanceVector(table1, table2, NeighIndex, myRoutingTable);
+                    myTable[MyIndex] = result.updatedTable
+                    myRoutingTable = result.nextHop
+                    for (let i = 0; i < payload.length; i++) {
+                      if (i !== MyIndex && !payload[i].every(num => num === 999)){
+                        myTable[i] = payload[i]
+                      }
+                    }
+                    // console.log(`Soy el nodo ${identifier}, recibi de ${neighID} su vector ${payload[NeighIndex]}`)
+                    
+                    if (!matricesAreEqual(myTable,payload)) {
                       await xmpp.send(
                         xml(
                           'iq',
@@ -317,6 +374,19 @@ function xmppConnection(username, password) {
                           xml('query', { xmlns: 'jabber:iq:roster' })
                         )
                       );
+                    }
+                  } else if (parsedBody.type === 'message' && parsedBody.headers.algorithm === 'Distance Vector') {
+                    let pto = parsedBody.headers.to.split('/')[0]
+                    if (pto.toUpperCase() === sessionId.toUpperCase()){
+                      console.log(`\n>>>>>>\nMensaje de ${parsedBody.headers.from}\n>>>>>>\n`)
+                      console.log(parsedBody.payload)
+                    }
+                    else {
+                      let nextHopJID = getNextHop(parsedBody.headers.to)
+                      console.log(`\n>>>>>>\nMensaje de ${parsedBody.headers.from}, para ${parsedBody.headers.to}, retrasmitiendo a ${nextHopJID}\n>>>>>>\n`)
+                      const messageStanza = xml('message', { to: nextHopJID, type: 'chat' }, xml('body', {}, JSON.stringify(parsedBody)));
+                      await xmpp.send(messageStanza);
+                      
                     }
                   }
                 }
@@ -412,7 +482,7 @@ function xmppConnection(username, password) {
                 // console.log(globResponse)
                 const messageStanza = xml('message', { to: contact.attrs.jid, type: 'chat' }, xml('body', {}, JSON.stringify(globResponse)));
                 await xmpp.send(messageStanza);
-                console.log('📇 Table sent to', contact.attrs.jid);
+                // console.log('📇 Table sent to', contact.attrs.jid);
               });
             }
             showMenu(xmpp);

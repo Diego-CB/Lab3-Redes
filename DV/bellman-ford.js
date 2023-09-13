@@ -44,7 +44,29 @@ const bellmanFord = (tableA, tableB) => {
   return tableA;
 }
 
+const updateDistanceVector = (receiverTable, senderTable, senderIndex, receiverNextHop) => {
+  let changed = false;
+
+  for (let i = 0; i < receiverTable.length; i++) {
+      if (receiverTable[i] > senderTable[i] + receiverTable[senderIndex]) {
+          receiverTable[i] = senderTable[i] + receiverTable[senderIndex];
+          receiverNextHop[i] = senderIndex;  // Actualizamos el vector de saltos para que apunte al emisor
+          changed = true;
+      }
+  }
+  return { updatedTable: receiverTable, nextHop: receiverNextHop, changed: changed };
+}
+
+// Test
+// let tableA = [1, 0, 999, 1];
+// let tableB = [0, 1, 1, 999];
+
+// let result = updateDistanceVector(tableA, tableB);
+// console.log(result.updatedTable);  // Debería imprimir [0, 1, 1, 2]
+// console.log(result.nextHop);       // Debería imprimir [0, 1, 2, 1]
+
 module.exports = {
   updateRoutingTable,
-  bellmanFord
+  bellmanFord,
+  updateDistanceVector
 };
