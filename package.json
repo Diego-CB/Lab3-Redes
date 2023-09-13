@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node --no-warnings index.js",
-    "ls": "node --no-warnings ./LinkState/index.js"
+    "ls": "node --no-warnings ./LinkState/index.js",
+    "fl": "node --no-warnings ./Flooding/indexfloodxmpp.js"
   },
   "repository": {
     "type": "git",

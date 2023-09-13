@@ -21,7 +21,7 @@ class xmClient {
         this.username = username;
         this.password = password;
         this.serverAT = "@alumchat.xyz";
-        this.errorLogPath = "./Flooding/error-log-xmpp.txt";
+        this.errorLogPath = "error-log-xmpp.txt";
         this.initErrorLog();
         this.contactosRoster = []; // Array para almacenar los contactos
         this.userJID;
@@ -89,14 +89,6 @@ class xmClient {
 
         }
     }
-
-    async addNeighbor() { }
-
-    async sendLinkState() { }
-
-    async sendDistanceVector() { }
-
-    async sendFlooding() { }
 }
 
 module.exports = {

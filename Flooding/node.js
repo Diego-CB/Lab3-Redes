@@ -7,8 +7,18 @@ Cristian Aguirre
 Node.js
 */
 
-const { Flood } = require("./flood");
-const { xmClient } = require("./xmClient");
+const { client, xml, jid } = require("@xmpp/client");
+const fs = require("fs");
+
+/*
+Funcion read file
+author: Diego Cordova
+*/
+const read_file = async filepath => {
+    const data = await fs.readFileSync(filepath, 'utf8' )
+    const parsed_data = JSON.parse(data)
+    return parsed_data
+}
 
 class Node {
     /*
@@ -19,18 +29,13 @@ class Node {
     */
     constructor(name) {
         this.name = name; // Asigna el nombre del nodo.
-        //this.password = password // Asigna la contraseña del nodo en el cliente.
+        this.pass = 'redes2023'
         this.neighbors = []; // Inicializa la lista de vecinos del nodo.
-        this.loggedClient = new xmClient(loggedInUser, loggedInPassword)
-
         this.server = "alumchat.xyz";
         this.conn = null;
         this.errorLogPath = "./Flooding/error-log-xmpp.txt";
         this.initErrorLog();
         this.userJID;
-        this.addMessage = [];
-
-        console.log(` >> Node ${this.name} created`);
     }
 
     initErrorLog() {
@@ -43,6 +48,27 @@ class Node {
     };
 
     /*
+    Funcion init para creacion de nodos en topologia
+    author: Diego Cordova
+    modificacion: no se realiza proceso de tablas requerido 
+                  para link state y se simplifica la topologia
+    */
+    async init() {
+        // Leer archivos
+        this.adress_map = (await read_file('./names-g4.txt'))['config']
+        this.userJID = this.adress_map[this.name].toLowerCase()
+        this.username = this.userJID.split("@")[0]
+        this.neighbors = (await read_file('./topo-g4.txt'))['config'][this.name]
+
+        // Llenar topologia
+        this.topology = []
+        this.neighbors.map((node) => this.topology.push({
+            from: this.name,
+            to: node
+        }))
+    }
+
+    /*
     Hacer login al servidor xmpp.
     Parámetro: n/a.
     Descripción: hace login del nodo con las descripciones de usuario
@@ -53,25 +79,24 @@ class Node {
             service: "xmpp://alumchat.xyz:5222",
             domain: "alumchat.xyz",
             username: this.username,
-            password: this.password,
+            password: this.pass,
+            terminal: true,
             tls: {
                 rejectUnauthorized: true,
             }
         });
     
         this.conn.on("online", async (jid) => {
-            console.log("\n >> Login successful! JID:\n", jid.toString());
             this.userJID = jid.toString().split("/")[0];
             this.JIDdevice = jid.toString();
             
             // Cambiar el estado de presencia a "activo"
             const presenceStanza = xml(
-                "presence",
-                { xmlns: "jabber:client" },
-                xml("show", {}, "chat"),
-                xml("status", {}, "Active")
+                'presence', {},
+                xml('show', {}, 'available')
             );
-            this.conn.send(presenceStanza);
+            await this.conn.send(presenceStanza);
+            console.log("\n >> Login successful! JID:\n", this.JIDdevice);
         });
     
         this.conn.on("error", (err) => {
@@ -91,7 +116,6 @@ class Node {
                     if (stanza.is("message") && stanza.attrs.type === "chat") {
                         const contactJID = stanza.attrs.from;
                         const messageBody = stanza.getChildText("body");
-
                         if (messageBody === null) {
 
                             console.log(` >> The user ${contactJID} sent empty message.`)
@@ -101,7 +125,7 @@ class Node {
                             console.log(` >> New messages from ${contactJID}`);
 
                             try {
-                                const jsonObject = JSON.parse(message);
+                                const jsonObject = JSON.parse(messageBody);
                             
                                 let messageType = jsonObject.type;
                                 let from = jsonObject.headers.from;
@@ -110,41 +134,43 @@ class Node {
                                 let receivers = jsonObject.headers.recievers;
                                 let payload = jsonObject.payload;
                     
-                                if (from == this.name){
-                                    console.log(` >> Message was sent by this user. No action needed.`);
-                                    return 0
-                                }
-                                // si estoy en la lista no hago nada
-                                if (receivers.find(elemento => elemento === this.name)) {
-                                    console.log(` >> Message sent by ${contactJID} has been recieved already. No action needed. `);
-                                    return 0
-                                } else {
-                                    // revisar si soy el to
-                                    if (to == this.name){
-                                        console.log(` >> Message sent by ${contactJID} has been forwarded to you.\n     The message is: ${payload}`)
-                                        hopCount == 0
-                                        receivers.push(this.name)
-                                        return 2
+                                if (hopCount == 0){
+                                    console.log(' >> hop reached 0. no more flood')
+                                }else {
+                                    if (from == this.name){
+                                        console.log(` >> Message was sent by this user. No action needed.`);
+                                    }
+                                    // si estoy en la lista no hago nada
+                                    if (receivers.find(elemento => elemento === this.name)) {
+                                        console.log(` >> Message sent by ${contactJID} has been recieved already. No action needed. `);
                                     } else {
-                                        // si no estoy en la lista y no soy en destinatario me agrego y envio el mensaje por flood a mis neighbors y reduzco el hopCount.
-                                        hopCount = hopCount - 1
-                                        receivers.push(this.name)
-                    
-                                        const paquete = {
-                                            type: messageType,
-                                            headers: {
-                                                from: from,
-                                                to: to,
-                                                hop_count: hopCount,
-                                                recievers: receivers
-                                            },
-                                            payload: payload
+                                        // revisar si soy el to
+                                        if (to == this.name){
+                                            console.log(` >> Message sent by ${contactJID} has been forwarded to you.\n     The message is: ${payload}`)
+                                            hopCount == 0
+                                            receivers.push(this.name)
+                                        } else {
+                                            // si no estoy en la lista y no soy en destinatario me agrego y envio el mensaje por flood a mis neighbors y reduzco el hopCount.
+                                            hopCount = hopCount - 1
+                                            receivers.push(this.name)
+                        
+                                            const paquete = {
+                                                type: messageType,
+                                                headers: {
+                                                    from: from,
+                                                    to: to,
+                                                    hop_count: hopCount,
+                                                    recievers: receivers
+                                                },
+                                                payload: payload
+                                            }
+                        
+                                            this.floodMessage(paquete)
+                        
                                         }
-                    
-                                        this.floodMessage(paquete)
-                    
                                     }
                                 }
+                                
                                 
                                 
                                 
@@ -152,86 +178,6 @@ class Node {
                                 console.error("Error al analizar el JSON:", error.message);
                             }
                         }
-                        
-                    }
-                    
-                    // añadir automaticamete a los vecinos
-                    if (stanza.attrs.type === "subscribe") {
-                        console.log(" >> Incoming contact request, approved!")
-                        this.notifications.push(` New suscription from ${stanza.attrs.from} accepted.`)
-                        // Aprobar automáticamente la solicitud de contacto
-                        const approvePresence = xml(
-                          "presence",
-                          { to: stanza.attrs.from, type: "subscribed" }
-                        );
-                        this.conn.send(approvePresence);
-                    }
-                    
-                    // revisar para tener vecinos actuales.
-                    if (stanza.is("presence")) {
-                        const presenceType = stanza.getChildText("status");
-                        const contactJID = stanza.attrs.from;
-                        const contactJIDWithoutResource = contactJID.toString().split("/")[0].trim();
-                        const existingContact = this.contactosRoster.find(contact => contact[0] === contactJIDWithoutResource);
-                        let  normalizedPresenceType;
-                        
-
-                        if(presenceType === null){
-                            normalizedPresenceType = "online";
-                            if (!existingContact) {
-                                this.contactosRoster.push([contactJIDWithoutResource, "Active"]);
-                            }
-
-                        } else {
-                            normalizedPresenceType = presenceType.toLowerCase().trim();
-                            if (!existingContact) {
-                                this.contactosRoster.push([contactJIDWithoutResource, stanza.getChildText("status"), presenceType]);
-                            }
-                        }
-                        
-
-                        if(contactJIDWithoutResource !== this.userJID) {
-                            const tiempitostatus = new Date()
-                            const hora = tiempitostatus.getHours();
-                            const minutos = tiempitostatus.getMinutes();
-                            const segundos = tiempitostatus.getSeconds();
-                            
-                            
-
-                            if (
-                                normalizedPresenceType === "offline" ||
-                                normalizedPresenceType === "away" ||
-                                normalizedPresenceType === "unavailable"
-                            ) {
-                                const contactJIDToRemove = contactJIDWithoutResource;
-
-                                this.contactosRoster = this.contactosRoster.map(contact => {
-                                    if (contact[0] === contactJIDToRemove) {
-                                        return [contactJIDToRemove, "Offline"]; // Actualiza el estado
-                                    }
-                                    return contact;
-                                });
-                            }
-
-
-                            if (presenceType === null) {
-                                const contactJIDToRemove = contactJIDWithoutResource;
-
-
-                                this.contactosRoster = this.contactosRoster.map(contact => {
-                                    if (contact[0] === contactJIDToRemove) {
-                                        return [contactJIDToRemove, "Active"]; // Actualiza el estado
-                                    }
-                                    return contact;
-                                });
-                            }
-
-                            console.log(`\n >> The user ${contactJID} is now ${presenceType === null ? 'online' : presenceType}.\n`);
-                            this.notifications.push(` ${contactJID} changed status to ${presenceType === null ? 'online' : presenceType} at ${hora}:${minutos}:${segundos}.\n`);
-
-
-                        }
-                        
                         
                     }
 
@@ -281,7 +227,7 @@ class Node {
                 { type: "set", id: "register1"},
                 xml("query", { xmlns: "jabber:iq:register" },
                 xml("username", {}, this.username),
-                xml("password", {}, this.password),
+                xml("password", {}, this.pass),
                 )
               );
             
@@ -331,36 +277,6 @@ class Node {
     }
 
     /*
-    Borrar una cuenta del servidor.
-    Parámetro: n/a.
-    Descripción: Borrar el nodo con las descripciones de usuario
-    y contraseña respectivas en el servidor xmpp
-    */
-    async deleteAccount() {
-
-        try {        
-            
-            const stanza = xml(
-                "iq", 
-                { type: "set", id: "delete-account"},
-                xml("query", { xmlns: "jabber:iq:register" },
-                xml("username", {}, this.username),
-                xml("password", {}, this.password),
-                xml("remove"),
-            ));
-
-            this.conn.send(stanza);
-            console.log(" >> Account deleted succesfully! ")
-        
-        } catch (error) {
-            const identifier = "deleteAccount";
-            this.logError(identifier, error);
-            console.error(" >> ERROR: error happened during delete (check error-log-xmpp.txt for info).");
-        }
-
-    }
-
-    /*
     Agrega un vecino al nodo actual.
     Parámetro: neighbor (Node) - El nodo vecino que se agregará.
     Descripción: Agrega un vecino al nodo haciendo así entonces una conexión
@@ -375,7 +291,7 @@ class Node {
             );
 
             this.conn.send(subscribeStanza);
-            this.neighbors.push(neighbor); // Agrega el nodo vecino a la lista de vecinos
+            //this.neighbors.push(neighbor); // Agrega el nodo vecino a la lista de vecinos
 
             console.log(` >> Node ${this.name} added neighbor ${neighbor}`);
         } catch (error) {
@@ -414,25 +330,33 @@ class Node {
     Descripción: Este es el principal algoritmo de enrutamiento Flood donde se establece la logica 
     con la que operaran los nodos.
     */
-    floodMessage(message) {
-        console.log(` >> Node ${this.name} received message: ${message} and is now using Flooding Routing Algorithm.`);
-        // Flooding!
-        Flood.floodMessage(this, message);
+    async floodMessage(message) {
+        console.log(` >> Node ${this.name} is sending the message using Flooding Routing Algorithm:\n    >>>  ${message}`);
+        this.neighbors.forEach(neighbor => {
+
+            let neighborJID = this.adress_map[neighbor].toLowerCase()
+
+            console.log(` >> Message was sent to ${neighbor} by ${this.name}`);
+            const jsonString = JSON.stringify(message);
+            console.log(`\n  >>${jsonString}`)
+
+            this.sendMessagesDM(neighborJID, jsonString)
+
+        });
     }
 
     /*
-    Funcion para enviar el mensaje a un usuario en el servidor xmppp.
-    Parámetro: userJID (string) - El JID o nombre de usuario completo de a quien se le enviará el mensaje.
-               bodied (string) - El mensaje que se va a propagar.
-    Descripción: Esta función toma xml de xmpp para JS y con la ayuda de la conexión
-    abierta actualmente envía un mensaje el cual para flooding contendrá el JSON. 
+    Envia un mensaje.
+    Parámetro: message (string) - El mensaje que se va a mandar.
+               userJID (string) - El usuario al que se va a mandar
+    Descripción: envia mensaje en servidor xmppp.
     */
     async sendMessagesDM(userJID, bodied) {
-
         try {
             const messageStanza = xml(
-                "message",
-                { to: userJID, type: "chat" },
+                "message", { 
+                    to: userJID, 
+                    type: "chat" },
                 xml("body", {}, bodied)
             );
             
@@ -442,69 +366,6 @@ class Node {
             this.logError(identifier, error);
             console.error(" >> ERROR: Unable to send message (check error-log-xmpp.txt for more info).");
         }
-    }
-
-    /*
-    Recibe un mensaje y lo reenvía a los nodos vecinos.
-    Parámetro: message (string) - El mensaje que se está reenviando.
-    Descripción: esta es una función ejecutada cuando un nodo recive un mensaje en la red
-    es aqui donde para ejecutar la lógica de flooding se llama a la función de la clase
-    Node floodMessage.
-    */
-    receiveMessage(message) {        
-        try {
-            const jsonObject = JSON.parse(message);
-        
-            let messageType = jsonObject.type;
-            let from = jsonObject.headers.from;
-            let to = jsonObject.headers.to;
-            let hopCount = jsonObject.headers.hop_count;
-            let receivers = jsonObject.headers.recievers;
-            let payload = jsonObject.payload;
-
-            if (from == this.name){
-                console.log(` >> Message was sent by this user. No action needed.`);
-                return 0
-            }
-            // si estoy en la lista no hago nada
-            if (receivers.find(elemento => elemento === this.name)) {
-                console.log("El elemento está en el array.");
-                return 0
-            } else {
-                // revisar si soy el to
-                if (to == this.name){
-                    console.log(` >> Message recieved. The message is: ${payload}`)
-                    hopCount == 0
-                    receivers.push(this.name)
-                    return 2
-                } else {
-                    // si no estoy en la lista y no soy en destinatario me agrego y envio el mensaje por flood a mis neighbors y reduzco el hopCount.
-                    hopCount = hopCount - 1
-                    receivers.push(this.name)
-
-                    const paquete = {
-                        type: messageType,
-                        headers: {
-                            from: from,
-                            to: to,
-                            hop_count: hopCount,
-                            recievers: receivers
-                        },
-                        payload: payload
-                    }
-
-                    this.floodMessage(paquete)
-
-                }
-            }
-            
-            
-            
-        } catch (error) {
-            console.error("Error al analizar el JSON:", error.message);
-        }
-
-        //this.floodMessage(message); // Reenvía el mensaje a los nodos vecinos
     }
 }
 

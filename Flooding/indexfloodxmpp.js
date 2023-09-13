@@ -10,6 +10,9 @@
 const readline = require('readline');
 const { Node } = require('./node.js');
 
+// VARIABLES IMPORTANTES
+let loggedInUser = "";
+let loggedInPassword = "";
 let loggedClient = null;
 
 const rl = readline.createInterface({
@@ -17,12 +20,13 @@ const rl = readline.createInterface({
     output: process.stdout
 });
 
-const getInput = (question) => {
-    return new Promise((resolve) => {
-        rl.question(question, (answer) => {
-            resolve(answer);
-        });
-    });
+const input = async (msg) => {
+    try {
+        return await new Promise((resolve) => rl.question(msg, resolve));
+    } catch (error) {
+        console.error("Error al obtener la entrada:", error);
+        throw error;
+    }
 };
 
 const main = async () => {
@@ -55,9 +59,9 @@ const handleRouting = async () => {
         switch (choice) {
             case 1:
                 console.log("Starting Flooding algorithm...");
-                const message = await getInput(' >> What message would you like to send:  ');
-                const dest = await getInput(' >> Who do you want to send the message to?\n     Enter the name:  ');
-                const hops = await getInput(' >> How many hops do you want the flooding to happen?\ Enter the ammount in numbers:  ');
+                const message = await input(' >> What message would you like to send:  ');
+                const dest = await input(' >> Who do you want to send the message to?\n     Enter the name:  ');
+                const hops = await input(' >> How many hops do you want the flooding to happen?\ Enter the ammount in numbers:  ');
                 const recievers = [loggedClient.name]
 
                 const paquete = {
@@ -87,34 +91,27 @@ const handleManagement = async () => {
     while (true) {
         const choice = await showManageMenu();
 
-        switch (choice) {
+        switch (choice) {            
             case 1:
-                console.log("Create node...");
-                const name_create = await getInput(' >> Node name:  ');
-                const password_create = await getInput(' >> Node password:  ');
-                
-                handleClientConnect(name_create, password_create);
-                loggedClient.signup(name_login, password_login);
+                loggedInUser = await input("Enter the node name: ");
+                console.log("Logging in user:", loggedInUser);
+                console.log("Password:", loggedInPassword);
+
+                handleClientConnect();
+                await loggedClient.init();
+                await loggedClient.login();
                 break;
             
             case 2:
-                console.log("Connect with node...");
-                const name_login = await getInput(' >> Node name:  ');
-                const password_login = await getInput(' >> Node password:  ');
-                handleClientConnect(name_create, password_create);
-                loggedClient.login(name_login, password_login);
-                break;
-            
-            case 3:
                 console.log("Add neighbor...");
-                const neighbor = await getInput(' >> Enter the neighbors JID you want to add:  ');
+                const neighbor = await input(' >> Enter the neighbors JID you want to add:  ');
                 loggedClient.addNeighbor(neighbor);
                 break;
-            case 4:
+            case 3:
                 console.log("Showing neighbors...")
                 loggedClient.showNeighbors();
                 break;
-            case 5:
+            case 4:
                 console.log("Returning to Main Menu...");
                 return;
             default:
@@ -129,7 +126,7 @@ const showMainMenu = async () => {
     console.log("2. Manage Nodes");
     console.log("3. Exit");
 
-    const choice = await getInput("\n >> Select an option: ");
+    const choice = await input("\n >> Select an option: ");
     return parseInt(choice);
 };
 
@@ -138,25 +135,25 @@ const showRoutingMenu = async () => {
     console.log("1. Start flooding algorithm");
     console.log("2. Back to Main Menu");
 
-    const choice = await getInput("\n >> Select an option: ");
+    const choice = await input("\n >> Select an option: ");
     return parseInt(choice);
 };
 
 const showManageMenu = async () => {
     console.log("\n\n\n--- Manage Nodes Menu ---");
-    console.log("1. Create node");
-    console.log("2. Connect with node");
-    console.log("3. Add Neighbor to node");
-    console.log("4. Show current neighbors");
-    console.log("5. Back to Main Menu");
+    console.log("1. Connect with node");
+    console.log("2. Add Neighbor to node");
+    console.log("3. Show current neighbors");
+    console.log("4. Back to Main Menu");
 
-    const choice = await getInput("\n >> Select an option: ");
+    const choice = await input("\n >> Select an option: ");
     return parseInt(choice);
 };
 
 /* La función "handleClientConnect" maneja la creación del objeto con la instancia de conexión al servidor XMPP. */
 const handleClientConnect = async () => {
-    loggedClient = new Node(loggedInUser, loggedInPassword);
+    console.log(loggedInUser)
+    loggedClient = new Node(loggedInUser);
 }
 
 main();
