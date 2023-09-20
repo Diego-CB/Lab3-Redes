@@ -125,8 +125,7 @@ function agregarVecino() {
     }
   });
 }
-
-
+ 
 function promptMenu() {
   rl.question('Que nodo soy? ', nodeid => {
     globResponse.headers.from = nodeid;

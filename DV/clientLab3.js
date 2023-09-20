@@ -16,7 +16,7 @@ let myJID = null;
 let sessionId;
 let globResponse = {
   type : "",
-  headers : {from:"", to:"", algorithm: 'Distance Vector'},
+  headers : {from:"", to:"", algorithm: 'DVR'},
   payload : []
 }
 let topoJson;
@@ -334,7 +334,7 @@ function xmppConnection(username, password) {
                 const body = stanza.getChildText('body');  // Contenido del mensaje
                 if (body) { // Algunos mensajes pueden no tener cuerpo, por lo que es importante verificar
                   let parsedBody = JSON.parse(body)
-                  if (parsedBody.type === 'info' && parsedBody.headers.algorithm === 'Distance Vector') {
+                  if (parsedBody.type === 'info' && parsedBody.headers.algorithm === 'DVR') {
                     let payload = parsedBody.payload
                     let pfrom = from.split('/')[0]
                     // counter+=1
@@ -375,7 +375,7 @@ function xmppConnection(username, password) {
                         )
                       );
                     }
-                  } else if (parsedBody.type === 'message' && parsedBody.headers.algorithm === 'Distance Vector') {
+                  } else if (parsedBody.type === 'message' && parsedBody.headers.algorithm === 'DVR') {
                     let pto = parsedBody.headers.to.split('/')[0]
                     if (pto.toUpperCase() === sessionId.toUpperCase()){
                       console.log(`\n>>>>>>\nMensaje de ${parsedBody.headers.from}\n>>>>>>\n`)
