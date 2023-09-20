@@ -62,7 +62,14 @@ const main = async () => {
             await node.send_discover()
 
         } else if (finish === '3') {
-            show_discover(node.Dijkstra_calc.routing_table)
+            const ruteo = node.Dijkstra_calc.routing_table
+            for (let i = 0; i < ruteo.length; i++) {
+                for (let j = 0; j < ruteo[0].length; j++) {
+                   ruteo[i][j] = node.reverse_map[ruteo[i][j][1]]
+                }
+            }
+            
+            show_discover(ruteo)
 
         } else {
             print('Error: ingrese una opcion valida')
